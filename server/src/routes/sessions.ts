@@ -6,6 +6,8 @@ import {
 } from "../services/session-manager.js";
 import { getSession, listSessions } from "../store/sessions.js";
 import { getProject } from "../store/projects.js";
+import { sendChatToSession } from "../services/chat.js";
+import { badRequest } from "../lib/errors.js";
 
 type ProjectParam = { projectId: string };
 type ProjectAndSessionParam = { projectId: string; sessionId: string };
@@ -59,6 +61,20 @@ sessionsRouter.delete<ProjectAndSessionParam>("/:sessionId", async (req, res, ne
   try {
     await stopAndDeleteSession(req.params.sessionId);
     res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
+sessionsRouter.post<ProjectAndSessionParam>("/:sessionId/chat", async (req, res, next) => {
+  try {
+    const body = z.object({ text: z.string().min(1).max(8000) }).parse(req.body);
+    const session = await getSession(req.params.sessionId);
+    if (session.status !== "running" || !session.containerId) {
+      throw badRequest("session is not running");
+    }
+    await sendChatToSession(session.containerId, body.text);
+    res.status(202).json({ ok: true });
   } catch (err) {
     next(err);
   }
