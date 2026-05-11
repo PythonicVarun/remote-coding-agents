@@ -38,8 +38,8 @@ proxy.on("error", (err, _req, res) => {
 function parseSessionFromPath(url: string): { sessionId: string; rest: string } | null {
   // Strip leading slash, split into segments.
   const trimmed = url.replace(/^\/+/, "");
-  // Expect: ttyd/<id>/<rest...>
-  const m = /^ttyd\/([A-Za-z0-9_-]+)(\/.*)?$/.exec(trimmed);
+  // Expect: <id>/<rest...>
+  const m = /^([A-Za-z0-9_-]+)(\/.*)?$/.exec(trimmed);
   if (!m) return null;
   return { sessionId: m[1]!, rest: m[2] ?? "/" };
 }
