@@ -1,0 +1,48 @@
+import { config as loadEnv } from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import fs from "node:fs";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+// repo root is two levels above src/ (server/src -> server -> repo root)
+const repoRoot = path.resolve(here, "..", "..");
+
+// Load .env from repo root if present.
+loadEnv({ path: path.join(repoRoot, ".env") });
+
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const n = Number.parseInt(raw, 10);
+  if (Number.isNaN(n)) throw new Error(`env ${name} must be an integer, got "${raw}"`);
+  return n;
+}
+
+function resolvePath(value: string | undefined, fallback: string): string {
+  const p = value && value.trim().length > 0 ? value : fallback;
+  return path.isAbsolute(p) ? p : path.resolve(repoRoot, p);
+}
+
+const projectsRoot = resolvePath(process.env.PROJECTS_ROOT, "./projects");
+const dataRoot = resolvePath(process.env.DATA_ROOT, "./data");
+
+// Ensure runtime dirs exist on boot.
+for (const dir of [projectsRoot, dataRoot]) {
+  fs.mkdirSync(dir, { recursive: true });
+}
+
+export const config = {
+  repoRoot,
+  serverPort: envInt("SERVER_PORT", 4000),
+  clientPort: envInt("CLIENT_PORT", 5173),
+  projectsRoot,
+  dataRoot,
+  agentImage: process.env.AGENT_IMAGE?.trim() || "rca-agent:latest",
+  ttydPortMin: envInt("TTYD_PORT_MIN", 7700),
+  ttydPortMax: envInt("TTYD_PORT_MAX", 7800),
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY?.trim() || "",
+  // Allow the frontend origin during dev. Tighten in prod.
+  corsOrigin: process.env.CORS_ORIGIN?.trim() || "*",
+} as const;
+
+export type Config = typeof config;
