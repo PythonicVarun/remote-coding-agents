@@ -50,7 +50,7 @@ case "$AGENT_KIND" in
       "Install with: sudo npm install -g @anthropic-ai/claude-code")
     ;;
   codex)
-    INNER_CMD=$(make_inner "codex" "--full-auto" \
+    INNER_CMD=$(make_inner "codex" "--yolo" \
       "Install with: sudo npm install -g @openai/codex")
     ;;
   gemini)
@@ -58,7 +58,7 @@ case "$AGENT_KIND" in
       "Install with: sudo npm install -g @google/gemini-cli")
     ;;
   copilot)
-    INNER_CMD=$(make_inner "copilot" "--allow-all-tools" \
+    INNER_CMD=$(make_inner "copilot" "--yolo" \
       "Install with: sudo npm install -g @github/copilot")
     ;;
   shell|*)

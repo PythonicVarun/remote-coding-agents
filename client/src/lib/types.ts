@@ -16,8 +16,8 @@ export const AGENTS: AgentMeta[] = [
   },
   {
     kind: "codex",
-    label: "Codex (full-auto)",
-    description: "OpenAI · runs with --full-auto. Needs OPENAI_API_KEY.",
+    label: "Codex (YOLO)",
+    description: "OpenAI · runs with --yolo. Needs OPENAI_API_KEY.",
   },
   {
     kind: "gemini",
@@ -26,8 +26,8 @@ export const AGENTS: AgentMeta[] = [
   },
   {
     kind: "copilot",
-    label: "GitHub Copilot CLI",
-    description: "GitHub · uses gh / GITHUB_TOKEN auth.",
+    label: "GitHub Copilot CLI (YOLO)",
+    description: "GitHub · runs with --yolo. Needs GITHUB_TOKEN.",
   },
   {
     kind: "shell",

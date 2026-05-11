@@ -98,9 +98,9 @@ Each session picks one agent at creation time. The agent image installs all of t
 | Agent | CLI | Default flags | Credential env var |
 | --- | --- | --- | --- |
 | **Claude Code** | `claude` (`@anthropic-ai/claude-code`) | `--dangerously-skip-permissions` | `ANTHROPIC_API_KEY` |
-| **Codex** | `codex` (`@openai/codex`) | `--full-auto` | `OPENAI_API_KEY` |
+| **Codex** | `codex` (`@openai/codex`) | `--yolo` | `OPENAI_API_KEY` |
 | **Gemini CLI** | `gemini` (`@google/gemini-cli`) | `--yolo` | `GEMINI_API_KEY` or `GOOGLE_API_KEY` |
-| **GitHub Copilot CLI** | `copilot` (`@github/copilot`) | `--allow-all-tools` | `GITHUB_TOKEN` |
+| **GitHub Copilot CLI** | `copilot` (`@github/copilot`) | `--yolo` | `GITHUB_TOKEN` |
 | **Bare shell** | `bash` | — | none |
 
 Only the credential matching the selected agent is forwarded into the container. If you need to change a flag, edit `docker/agent/entrypoint.sh` and rebuild the image (`npm run docker:build-agent`).
