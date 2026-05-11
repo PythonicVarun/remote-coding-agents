@@ -73,7 +73,7 @@ RUN set -eu; \
     done
 
 # Non-root user with passwordless sudo
-RUN useradd -m -s /bin/bash -u 1000 agent \
+RUN useradd -m -s /bin/bash -u 24542 agent \
     && echo "agent ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/agent \
     && chmod 0440 /etc/sudoers.d/agent
 
