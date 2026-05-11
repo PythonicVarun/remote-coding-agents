@@ -13,6 +13,7 @@ import {
   ensureAgentImage,
   startSessionContainer,
   stopAndRemoveContainer,
+  verifyWorkspaceWritable,
 } from "./docker.js";
 import { sendChatToSession } from "./chat.js";
 import { logger } from "../lib/logger.js";
@@ -112,6 +113,7 @@ export async function createAndStartSession(input: CreateSessionInput): Promise<
       hostProjectPath: project.path,
       agent: input.agent,
     });
+    await verifyWorkspaceWritable(containerId);
     let running = await updateSession(session.id, {
       status: "running",
       containerId,
@@ -137,6 +139,10 @@ export async function createAndStartSession(input: CreateSessionInput): Promise<
     log.info("session started", { sessionId: session.id, containerId, hostTtydPort });
     return running;
   } catch (err) {
+    const failed = await getSession(session.id).catch(() => null);
+    if (failed?.containerId) {
+      await stopAndRemoveContainer(failed.containerId, failed.ttydPort).catch(() => undefined);
+    }
     await updateSession(session.id, {
       status: "error",
       lastError: err instanceof Error ? err.message : String(err),

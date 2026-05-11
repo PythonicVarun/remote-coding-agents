@@ -188,6 +188,20 @@ export async function execInContainer(containerId: string, cmd: string[]): Promi
   };
 }
 
+export async function verifyWorkspaceWritable(containerId: string): Promise<void> {
+  const probe = await execInContainer(containerId, [
+    "bash",
+    "-lc",
+    "set -euo pipefail; probe=/workspace/.rca-write-test-$$; echo ok > \"$probe\"; rm -f \"$probe\"",
+  ]);
+  if (probe.exitCode !== 0) {
+    throw serverError("project directory is not writable inside the container", {
+      stdout: probe.stdout.trim(),
+      stderr: probe.stderr.trim(),
+    });
+  }
+}
+
 /**
  * On boot, scan for containers we own that may still be running from a
  * previous server run, and re-reserve their host ports. We do NOT auto-stop

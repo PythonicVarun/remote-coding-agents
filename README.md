@@ -137,6 +137,8 @@ Restart `npm run dev` after editing `.env`.
    - If the agent CLI exits or crashes, the container automatically relaunches it in resume/continue mode and the web UI shows a restart popup.
 5. **Stop the session.** Hover the session card and click the trash icon — the container is stopped and removed.
 
+At session startup the backend performs a small write probe inside `/workspace`. If the bind-mounted project directory is not writable, session creation fails early instead of letting the agent run without syncing changes back to the host.
+
 ## Security notes
 
 - The agent runs in **YOLO mode** by design, so it can run arbitrary commands inside its container. The blast radius is the **container**, plus the bind-mounted **project folder**. Don't bind-mount anything you don't want the agent to be able to modify.
