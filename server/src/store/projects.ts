@@ -4,6 +4,7 @@ import { nanoid } from "nanoid";
 import { config } from "../config.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { isValidProjectName, slugify } from "../lib/slug.js";
+import { ensureProjectTreeWritable } from "../services/project-permissions.js";
 import { mutate, readState, type Project } from "./state.js";
 
 export async function listProjects(): Promise<Project[]> {
@@ -37,6 +38,7 @@ export async function createProject(name: string): Promise<Project> {
     const dir = path.join(config.projectsRoot, slug);
     try {
       await fs.mkdir(dir, { recursive: false });
+      await ensureProjectTreeWritable(dir);
     } catch (err: unknown) {
       const code = (err as NodeJS.ErrnoException).code;
       if (code === "EEXIST") throw conflict(`folder ${slug} already exists on disk`);

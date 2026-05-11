@@ -15,6 +15,7 @@ import {
   stopAndRemoveContainer,
   verifyWorkspaceWritable,
 } from "./docker.js";
+import { ensureProjectTreeWritable } from "./project-permissions.js";
 import { sendChatToSession } from "./chat.js";
 import { logger } from "../lib/logger.js";
 import { badRequest } from "../lib/errors.js";
@@ -60,6 +61,7 @@ export async function createAndStartSession(input: CreateSessionInput): Promise<
   }
 
   const project = await getProject(input.projectId);
+  await ensureProjectTreeWritable(project.path);
   await ensureAgentImage();
 
   // If per-project, see if another session for this project already has a

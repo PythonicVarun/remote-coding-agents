@@ -139,7 +139,7 @@ Restart `npm run dev` after editing `.env`.
 
 At session startup the backend performs a small write probe inside `/workspace`. If the bind-mounted project directory is not writable, session creation fails early instead of letting the agent run without syncing changes back to the host.
 
-UI-created containers are started as `root` specifically so the bind-mounted project directory remains writable across host setups where the image's non-root user would otherwise fail to edit the local folder.
+UI-created containers run as the dedicated `agent` user. On POSIX hosts, the backend normalizes permissions on the app-managed project tree before starting the session so the bind-mounted folder remains writable for that user.
 
 ## Security notes
 
