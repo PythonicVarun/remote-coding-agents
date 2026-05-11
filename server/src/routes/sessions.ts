@@ -7,13 +7,16 @@ import {
 import { getSession, listSessions } from "../store/sessions.js";
 import { getProject } from "../store/projects.js";
 
+type ProjectParam = { projectId: string };
+type ProjectAndSessionParam = { projectId: string; sessionId: string };
+
 export const sessionsRouter = Router({ mergeParams: true });
 
 // Nested under /projects/:projectId/sessions
 
-sessionsRouter.get("/", async (req, res, next) => {
+sessionsRouter.get<ProjectParam>("/", async (req, res, next) => {
   try {
-    const projectId = req.params.projectId!;
+    const projectId = req.params.projectId;
     await getProject(projectId); // 404 if missing
     res.json(await listSessions(projectId));
   } catch (err) {
@@ -21,9 +24,9 @@ sessionsRouter.get("/", async (req, res, next) => {
   }
 });
 
-sessionsRouter.post("/", async (req, res, next) => {
+sessionsRouter.post<ProjectParam>("/", async (req, res, next) => {
   try {
-    const projectId = req.params.projectId!;
+    const projectId = req.params.projectId;
     const body = z
       .object({
         title: z.string().min(1).max(120),
@@ -44,17 +47,17 @@ sessionsRouter.post("/", async (req, res, next) => {
   }
 });
 
-sessionsRouter.get("/:sessionId", async (req, res, next) => {
+sessionsRouter.get<ProjectAndSessionParam>("/:sessionId", async (req, res, next) => {
   try {
-    res.json(await getSession(req.params.sessionId!));
+    res.json(await getSession(req.params.sessionId));
   } catch (err) {
     next(err);
   }
 });
 
-sessionsRouter.delete("/:sessionId", async (req, res, next) => {
+sessionsRouter.delete<ProjectAndSessionParam>("/:sessionId", async (req, res, next) => {
   try {
-    await stopAndDeleteSession(req.params.sessionId!);
+    await stopAndDeleteSession(req.params.sessionId);
     res.status(204).end();
   } catch (err) {
     next(err);
