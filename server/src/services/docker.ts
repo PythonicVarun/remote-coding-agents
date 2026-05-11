@@ -88,6 +88,7 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
   const env: string[] = [
     `AGENT_KIND=${opts.agent}`,
     `TTYD_PORT=7681`,
+    "HOME=/root",
     ...credentialEnvForAgent(opts.agent),
   ];
   if (opts.initialCmd) env.push(`INITIAL_CMD=${opts.initialCmd}`);
@@ -103,6 +104,10 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
       Image: config.agentImage,
       name: opts.name,
       Env: env,
+      // Run UI-created sessions as root so the bind-mounted host project
+      // directory stays writable even when host UID/GID permissions don't
+      // match the image's non-root `agent` user.
+      User: "0:0",
       Tty: true,
       OpenStdin: true,
       ExposedPorts: { [internalPort]: {} },
