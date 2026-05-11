@@ -74,7 +74,7 @@ export function WorkspacePage() {
 
       <div className="grid flex-1 grid-cols-1 overflow-auto lg:grid-cols-[280px_minmax(0,1fr)_340px] lg:overflow-hidden">
         {/* Left: file tree + sessions */}
-        <aside className="grid min-h-0 grid-rows-[minmax(220px,1fr)_minmax(220px,1fr)] border-b border-border-subtle bg-bg-subtle lg:flex lg:border-b-0 lg:border-r">
+        <aside className="grid min-h-0 grid-rows-[minmax(220px,1fr)_minmax(220px,1fr)] border-b border-border-subtle bg-bg-subtle lg:flex lg:border-b-0 lg:border-r flex-col justify-between">
           <div className="min-h-0 overflow-hidden border-b border-border-subtle">
             <FileTree projectId={projectId} />
           </div>
