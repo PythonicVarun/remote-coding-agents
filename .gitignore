@@ -2,10 +2,10 @@
 node_modules/
 */node_modules/
 **/node_modules/
-.pnpm-store/
 .npm/
+.pnpm-store/
 
-# Build output
+# Build outputs
 dist/
 build/
 out/
@@ -14,35 +14,28 @@ out/
 .vite/
 .cache/
 .turbo/
-
-# TypeScript
-*.tsbuildinfo
-
-# Vite config build outputs (from tsc -b composite project)
 client/vite.config.d.ts
 client/vite.config.js
+*.tsbuildinfo
 
-# Logs
+# Logs and runtime files
 logs/
 *.log
+*.pid
+*.pid.lock
+*.seed
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Runtime data
-pids/
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage / test artifacts
+# Coverage and reports
 coverage/
-*.lcov
 .nyc_output/
+*.lcov
 
-# Environment files (never commit secrets)
+# Local environment files
 .env
 .env.local
 .env.*.local
@@ -51,7 +44,14 @@ coverage/
 *.env
 !.env.example
 
-# Editor / OS
+# Runtime project data
+projects/*
+!projects/.gitkeep
+data/*
+!data/.gitkeep
+sessions/
+
+# Editor and OS files
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.example.json
@@ -62,19 +62,11 @@ coverage/
 Thumbs.db
 desktop.ini
 
-# Per-project user data — created at runtime, must never be committed
-projects/*
-!projects/.gitkeep
-data/*
-!data/.gitkeep
-sessions/
-
-# Docker
-.docker-tmp/
-
-# Claude Code local state
+# Local tooling state
 .claude/
+.docker-tmp/
+.devcontainer/devcontainer-lock.json
 
-# Misc
+# Archives
 *.tgz
 *.tar.gz

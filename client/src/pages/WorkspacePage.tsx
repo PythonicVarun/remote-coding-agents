@@ -72,13 +72,13 @@ export function WorkspacePage() {
         </div>
       ) : null}
 
-      <div className="grid flex-1 grid-cols-[260px_minmax(0,1fr)_320px] overflow-hidden">
+      <div className="grid flex-1 grid-cols-1 overflow-auto lg:grid-cols-[280px_minmax(0,1fr)_340px] lg:overflow-hidden">
         {/* Left: file tree + sessions */}
-        <aside className="flex flex-col border-r border-border-subtle bg-bg-subtle">
-          <div className="h-1/2 min-h-0 overflow-hidden border-b border-border-subtle">
+        <aside className="grid min-h-0 grid-rows-[minmax(220px,1fr)_minmax(220px,1fr)] border-b border-border-subtle bg-bg-subtle lg:flex lg:border-b-0 lg:border-r">
+          <div className="min-h-0 overflow-hidden border-b border-border-subtle">
             <FileTree projectId={projectId} />
           </div>
-          <div className="h-1/2 min-h-0 overflow-hidden">
+          <div className="min-h-0 overflow-hidden">
             <SessionsPanel
               projectId={projectId}
               selectedId={selectedSessionId}
@@ -88,12 +88,12 @@ export function WorkspacePage() {
         </aside>
 
         {/* Center: ttyd terminal */}
-        <section className="min-w-0 bg-bg">
+        <section className="min-h-[380px] min-w-0 border-b border-border-subtle bg-bg lg:min-h-0 lg:border-b-0">
           <TerminalFrame projectId={projectId} sessionId={selectedSessionId} />
         </section>
 
         {/* Right: chat */}
-        <aside className="border-l border-border-subtle bg-bg-subtle">
+        <aside className="min-h-[280px] bg-bg-subtle lg:min-h-0 lg:border-l lg:border-border-subtle">
           <ChatPanel
             projectId={projectId}
             sessionId={selectedSessionId}

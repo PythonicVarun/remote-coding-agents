@@ -29,20 +29,22 @@ sessionsRouter.get<ProjectParam>("/", async (req, res, next) => {
 sessionsRouter.post<ProjectParam>("/", async (req, res, next) => {
   try {
     const projectId = req.params.projectId;
-    const body = z
-      .object({
-        title: z.string().min(1).max(120),
-        agent: z.enum(["claude", "codex", "gemini", "copilot", "shell"]),
-        containerStrategy: z.enum(["per-session", "per-project"]),
-      })
-      .parse(req.body);
+      const body = z
+        .object({
+          title: z.string().min(1).max(120),
+          agent: z.enum(["claude", "codex", "gemini", "copilot", "shell"]),
+          containerStrategy: z.enum(["per-session", "per-project"]),
+          initialPrompt: z.string().max(8000).optional(),
+        })
+        .parse(req.body);
 
-    const session = await createAndStartSession({
-      projectId,
-      title: body.title,
-      agent: body.agent,
-      containerStrategy: body.containerStrategy,
-    });
+      const session = await createAndStartSession({
+        projectId,
+        title: body.title,
+        agent: body.agent,
+        containerStrategy: body.containerStrategy,
+        initialPrompt: body.initialPrompt,
+      });
     res.status(201).json(session);
   } catch (err) {
     next(err);

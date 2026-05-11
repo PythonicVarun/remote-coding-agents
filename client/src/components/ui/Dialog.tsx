@@ -41,7 +41,7 @@ export function Dialog({ open, onClose, title, description, children, footer, wi
         role="dialog"
         aria-modal="true"
         className={cn(
-          "relative w-full rounded-lg border border-border bg-bg-subtle shadow-2xl",
+          "relative w-full rounded-xl border border-border bg-bg-subtle shadow-panel",
           widthClass,
         )}
       >

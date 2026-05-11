@@ -14,6 +14,7 @@ import {
   startSessionContainer,
   stopAndRemoveContainer,
 } from "./docker.js";
+import { sendChatToSession } from "./chat.js";
 import { logger } from "../lib/logger.js";
 import { badRequest } from "../lib/errors.js";
 
@@ -24,6 +25,25 @@ export interface CreateSessionInput {
   title: string;
   agent: AgentKind;
   containerStrategy: ContainerStrategy;
+  initialPrompt?: string;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function deliverInitialPrompt(containerId: string, text: string): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      await sendChatToSession(containerId, text);
+      return;
+    } catch (err) {
+      lastError = err;
+      await sleep(500);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 export async function createAndStartSession(input: CreateSessionInput): Promise<Session> {
@@ -32,6 +52,10 @@ export async function createAndStartSession(input: CreateSessionInput): Promise<
   }
   if (!["per-session", "per-project"].includes(input.containerStrategy)) {
     throw badRequest("containerStrategy must be 'per-session' or 'per-project'");
+  }
+  const initialPrompt = input.initialPrompt?.trim();
+  if (initialPrompt && initialPrompt.length > 8000) {
+    throw badRequest("initialPrompt must be 8000 chars or fewer");
   }
 
   const project = await getProject(input.projectId);
@@ -50,11 +74,28 @@ export async function createAndStartSession(input: CreateSessionInput): Promise<
     );
     if (existing) {
       const session = await createSession(input);
-      const attached = await updateSession(session.id, {
+      let attached = await updateSession(session.id, {
         status: "running",
         containerId: existing.containerId!,
         ttydPort: existing.ttydPort!,
+        lastError: undefined,
       });
+      if (initialPrompt) {
+        try {
+          await deliverInitialPrompt(existing.containerId!, initialPrompt);
+        } catch (err) {
+          attached = await updateSession(session.id, {
+            lastError: `session started, but initial task failed: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          });
+          log.warn("failed to deliver initial prompt to shared container", {
+            sessionId: session.id,
+            containerId: existing.containerId,
+            err: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
       log.info("attached to existing per-project container", {
         sessionId: session.id,
         containerId: existing.containerId,
@@ -71,11 +112,28 @@ export async function createAndStartSession(input: CreateSessionInput): Promise<
       hostProjectPath: project.path,
       agent: input.agent,
     });
-    const running = await updateSession(session.id, {
+    let running = await updateSession(session.id, {
       status: "running",
       containerId,
       ttydPort: hostTtydPort,
+      lastError: undefined,
     });
+    if (initialPrompt) {
+      try {
+        await deliverInitialPrompt(containerId, initialPrompt);
+      } catch (err) {
+        running = await updateSession(session.id, {
+          lastError: `session started, but initial task failed: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        });
+        log.warn("failed to deliver initial prompt", {
+          sessionId: session.id,
+          containerId,
+          err: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
     log.info("session started", { sessionId: session.id, containerId, hostTtydPort });
     return running;
   } catch (err) {

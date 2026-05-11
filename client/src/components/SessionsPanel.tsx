@@ -157,6 +157,7 @@ function CreateSessionDialog({ open, projectId, onClose, onCreated }: CreateSess
   const [title, setTitle] = useState("");
   const [agent, setAgent] = useState<AgentKind>("claude");
   const [strategy, setStrategy] = useState<ContainerStrategy>("per-session");
+  const [initialPrompt, setInitialPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -165,6 +166,7 @@ function CreateSessionDialog({ open, projectId, onClose, onCreated }: CreateSess
       setTitle("");
       setAgent("claude");
       setStrategy("per-session");
+      setInitialPrompt("");
       setError(null);
     }
   }, [open]);
@@ -180,6 +182,7 @@ function CreateSessionDialog({ open, projectId, onClose, onCreated }: CreateSess
         title: title.trim() || fallbackTitle,
         agent,
         containerStrategy: strategy,
+        initialPrompt: initialPrompt.trim() || undefined,
       });
       onCreated(s);
     } catch (e) {
@@ -194,7 +197,8 @@ function CreateSessionDialog({ open, projectId, onClose, onCreated }: CreateSess
       open={open}
       onClose={onClose}
       title="New session"
-      description="Each session runs in its own Docker container with the project bind-mounted at /workspace."
+      description="Start an agent container, optionally seed it with an initial task, and watch the terminal live."
+      width="lg"
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={busy}>
@@ -238,6 +242,25 @@ function CreateSessionDialog({ open, projectId, onClose, onCreated }: CreateSess
             <option value="per-session">New container for this session</option>
             <option value="per-project">Attach to existing project container</option>
           </Select>
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-fg-muted">Initial task</span>
+          <textarea
+            value={initialPrompt}
+            onChange={(e) => setInitialPrompt(e.target.value)}
+            rows={4}
+            maxLength={8000}
+            placeholder="Optional. Example: Scaffold a FastAPI service with health and metrics endpoints."
+            className={cn(
+              "w-full resize-y rounded-md border border-border bg-bg-elevated px-3 py-2 text-sm",
+              "text-fg placeholder:text-fg-subtle",
+              "focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/40",
+              "disabled:opacity-50 transition-colors",
+            )}
+          />
+          <span className="mt-1 block text-[11px] text-fg-subtle">
+            If provided, the message is injected into the agent terminal automatically after the session starts.
+          </span>
         </label>
         {error ? (
           <div className="rounded border border-danger/30 bg-danger-subtle px-3 py-2 text-xs text-danger">

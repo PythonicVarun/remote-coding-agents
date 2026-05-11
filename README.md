@@ -17,10 +17,10 @@ The agent (Claude Code by default) runs in YOLO mode (`--dangerously-skip-permis
 ```bash
 git clone <this-repo>
 cd remote-coding-agents
-node scripts/setup.mjs   # interactive TUI: checks prereqs, installs, builds image
+npm run setup            # interactive TUI: checks prereqs, writes .env, installs, builds image
 ```
 
-The TUI will offer to run `npm run dev` for you at the end. Then open <http://localhost:5173>.
+The setup script is the intended single entrypoint after cloning. It will offer to run `npm run dev` for you at the end. Then open <http://localhost:5173>.
 
 If you'd rather drive it yourself after running setup once:
 
@@ -132,6 +132,7 @@ Restart `npm run dev` after editing `.env`.
 3. **Create a session.** Choose:
    - **Agent**: Claude Code, Codex, Gemini CLI, GitHub Copilot CLI, or bare shell.
    - **Container**: a fresh container for this session, or attach to the project's existing container (sessions sharing one container share the same tmux pane).
+   - **Initial task**: optional. If you provide one, the backend injects it into the agent terminal automatically once the session is up.
 4. **Watch and steer.** The terminal pane shows the agent's commands live; the file tree highlights writes; the chat panel sends typed instructions into the pane.
 5. **Stop the session.** Hover the session card and click the trash icon — the container is stopped and removed.
 
@@ -149,6 +150,7 @@ Restart `npm run dev` after editing `.env`.
 - **ttyd iframe shows "session not running"** — The session container exited. Check `docker logs rca-<sessionId>` for the stack trace, then delete the session and create a new one.
 - **Claude Code says it can't find an API key** — Set `ANTHROPIC_API_KEY` in `.env`, restart the backend, and create a fresh session. (Containers receive the key at creation time.)
 - **File tree doesn't update** — Make sure your platform supports inotify-style watches. On Windows, mount the project on a local NTFS volume rather than over a network share.
+- **Client build fails with a missing Rollup native package on Windows** — Re-run `npm install --workspaces --include-workspace-root`. This is usually an incomplete optional dependency install in `node_modules`, not a code issue.
 
 ## Development
 

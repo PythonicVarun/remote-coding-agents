@@ -25,7 +25,7 @@ export function ProjectCard({ project, onDelete }: ProjectCardProps) {
   };
 
   return (
-    <div className="group relative flex flex-col gap-3 rounded-lg border border-border bg-bg-subtle p-4 transition-colors hover:border-border-strong">
+    <div className="group relative flex flex-col gap-3 rounded-xl border border-border bg-bg-subtle/95 p-4 shadow-panel transition-colors hover:border-border-strong">
       <div className="flex items-start justify-between gap-3">
         <Link to={`/projects/${project.id}`} className="flex min-w-0 items-start gap-3">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent-subtle text-accent">

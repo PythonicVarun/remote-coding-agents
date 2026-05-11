@@ -61,7 +61,12 @@ export const api = {
     request<Session[]>(`/api/projects/${projectId}/sessions`),
   createSession: (
     projectId: string,
-    body: { title: string; agent: AgentKind; containerStrategy: ContainerStrategy },
+    body: {
+      title: string;
+      agent: AgentKind;
+      containerStrategy: ContainerStrategy;
+      initialPrompt?: string;
+    },
   ) =>
     request<Session>(`/api/projects/${projectId}/sessions`, {
       method: "POST",
