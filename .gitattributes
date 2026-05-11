@@ -1,0 +1,8 @@
+# Force LF for files consumed by Linux containers — CRLF breaks shebangs.
+*.sh           text eol=lf
+Dockerfile     text eol=lf
+*.Dockerfile   text eol=lf
+entrypoint.sh  text eol=lf
+
+# Default: let git decide, but normalize text on commit.
+*              text=auto
