@@ -18,6 +18,10 @@ out/
 # TypeScript
 *.tsbuildinfo
 
+# Vite config build outputs (from tsc -b composite project)
+client/vite.config.d.ts
+client/vite.config.js
+
 # Logs
 logs/
 *.log
