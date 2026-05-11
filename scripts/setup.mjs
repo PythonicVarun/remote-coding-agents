@@ -11,7 +11,49 @@
 //   4. Builds the agent Docker image
 //   5. Offers to launch `npm run dev`
 
-import {
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, copyFileSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(here, "..");
+const envFile = path.join(repoRoot, ".env");
+const envExample = path.join(repoRoot, ".env.example");
+
+// Bootstrap: @clack/prompts is a root devDep, so on a fresh clone it isn't
+// available until `npm install` has run. Try to import it; if it's missing,
+// run `npm install` first (with plain console output) and then import.
+async function loadClack() {
+  try {
+    return await import("@clack/prompts");
+  } catch (err) {
+    if (err && err.code !== "ERR_MODULE_NOT_FOUND") throw err;
+  }
+  console.log(
+    "\x1b[36m›\x1b[39m First run — installing dependencies before the interactive setup starts.",
+  );
+  console.log("  (This step only happens once.)\n");
+  const res = spawnSync(
+    "npm",
+    ["install", "--workspaces", "--include-workspace-root", "--no-fund", "--no-audit"],
+    {
+      cwd: repoRoot,
+      stdio: "inherit",
+      shell: process.platform === "win32",
+    },
+  );
+  if (res.status !== 0) {
+    console.error(
+      "\x1b[31m✗ npm install failed.\x1b[39m Fix the error above, then re-run `node scripts/setup.mjs`.",
+    );
+    process.exit(res.status ?? 1);
+  }
+  console.log();
+  return import("@clack/prompts");
+}
+
+const {
   intro,
   outro,
   text,
@@ -23,16 +65,7 @@ import {
   isCancel,
   note,
   group,
-} from "@clack/prompts";
-import { spawn, spawnSync } from "node:child_process";
-import { existsSync, copyFileSync, readFileSync, writeFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const here = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(here, "..");
-const envFile = path.join(repoRoot, ".env");
-const envExample = path.join(repoRoot, ".env.example");
+} = await loadClack();
 
 const color = {
   dim: (s) => `\x1b[2m${s}\x1b[22m`,
