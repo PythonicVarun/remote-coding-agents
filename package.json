@@ -1,0 +1,27 @@
+{
+  "name": "remote-coding-agents",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A web workbench for running containerised AI coding agents with live filesystem, embedded terminal, and chat.",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "dev": "npm-run-all --parallel dev:server dev:client",
+    "dev:server": "npm --workspace server run dev",
+    "dev:client": "npm --workspace client run dev",
+    "build": "npm --workspace server run build && npm --workspace client run build",
+    "start": "npm --workspace server run start",
+    "docker:build-agent": "docker build -t rca-agent:latest -f docker/agent/Dockerfile docker/agent",
+    "lint": "npm --workspace server run lint --if-present && npm --workspace client run lint --if-present"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@clack/prompts": "^0.7.0",
+    "npm-run-all2": "^6.2.0"
+  }
+}
