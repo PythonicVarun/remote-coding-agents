@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bot, Plus, Trash2, TerminalSquare } from "lucide-react";
 import { api } from "@/lib/api";
 import { AGENTS, type AgentKind, type ContainerStrategy, type Session } from "@/lib/types";
@@ -19,12 +19,38 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
   const [sessions, setSessions] = useState<Session[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [crashNotice, setCrashNotice] = useState<{
+    sessionTitle: string;
+    message: string;
+    restartedAt?: string;
+  } | null>(null);
+  const seenRestartCounts = useRef<Map<string, number>>(new Map());
+  const isFirstLoad = useRef(true);
 
   const reload = async () => {
     try {
       const list = await api.listSessions(projectId);
       setSessions(list);
       setError(null);
+      if (isFirstLoad.current) {
+        seenRestartCounts.current = new Map(list.map((s) => [s.id, s.agentRestartCount ?? 0]));
+        isFirstLoad.current = false;
+      } else {
+        for (const session of list) {
+          const previous = seenRestartCounts.current.get(session.id) ?? 0;
+          const current = session.agentRestartCount ?? 0;
+          if (current > previous && session.agent !== "shell") {
+            setCrashNotice({
+              sessionTitle: session.title,
+              message:
+                session.agentCrashMessage ??
+                "The agent exited and was automatically resumed in the latest conversation.",
+              restartedAt: session.agentLastCrashAt,
+            });
+          }
+        }
+        seenRestartCounts.current = new Map(list.map((s) => [s.id, s.agentRestartCount ?? 0]));
+      }
       if (!selectedId && list.length > 0 && list[0]) onSelect(list[0].id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "failed to load sessions");
@@ -32,6 +58,9 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
   };
 
   useEffect(() => {
+    isFirstLoad.current = true;
+    seenRestartCounts.current = new Map();
+    setCrashNotice(null);
     void reload();
     const poll = window.setInterval(() => void reload(), 4000);
     return () => window.clearInterval(poll);
@@ -95,6 +124,12 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
                       <Badge tone={statusTone(s.status)}>{s.status}</Badge>
                       <Badge tone="neutral">{s.agent}</Badge>
                       <Badge tone="neutral">{s.containerStrategy}</Badge>
+                      {typeof s.agentRestartCount === "number" && s.agentRestartCount > 0 ? (
+                        <Badge tone="warning">resumed {s.agentRestartCount}</Badge>
+                      ) : null}
+                      {s.agentState === "restarting" ? (
+                        <Badge tone="warning">restarting</Badge>
+                      ) : null}
                     </span>
                     {s.lastError ? (
                       <span className="mt-1 block truncate text-[10px] text-danger">
@@ -129,6 +164,32 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
           void reload();
         }}
       />
+      <Dialog
+        open={Boolean(crashNotice)}
+        onClose={() => setCrashNotice(null)}
+        title="Agent Restarted"
+        description="The running agent exited or crashed. The container resumed the latest conversation automatically."
+        footer={
+          <Button variant="primary" onClick={() => setCrashNotice(null)}>
+            Dismiss
+          </Button>
+        }
+      >
+        <div className="space-y-3 text-sm text-fg-muted">
+          <p>
+            <span className="font-medium text-fg">{crashNotice?.sessionTitle}</span>
+            {" "}was restarted in resume mode.
+          </p>
+          <div className="rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-xs text-warning">
+            {crashNotice?.message}
+          </div>
+          {crashNotice?.restartedAt ? (
+            <p className="text-xs text-fg-subtle">
+              Restart detected at {new Date(crashNotice.restartedAt).toLocaleString()}.
+            </p>
+          ) : null}
+        </div>
+      </Dialog>
     </div>
   );
 }

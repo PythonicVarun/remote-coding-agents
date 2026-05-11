@@ -78,8 +78,9 @@ RUN useradd -m -s /bin/bash -u 24542 agent \
     && chmod 0440 /etc/sudoers.d/agent
 
 # Entrypoint script handles agent-kind selection
+COPY agent-supervisor.sh /usr/local/bin/agent-supervisor.sh
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/agent-supervisor.sh /usr/local/bin/entrypoint.sh
 
 USER agent
 WORKDIR /workspace

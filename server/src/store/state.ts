@@ -9,6 +9,7 @@ import { logger } from "../lib/logger.js";
 const log = logger("store");
 
 export type AgentKind = "claude" | "codex" | "gemini" | "copilot" | "shell";
+export type AgentState = "idle" | "running" | "restarting" | "stopped";
 export const AGENT_KINDS: readonly AgentKind[] = [
   "claude",
   "codex",
@@ -40,6 +41,12 @@ export interface Session {
   ttydPort?: number;
   status: "creating" | "running" | "stopped" | "error";
   lastError?: string;
+  agentState?: AgentState;
+  agentRestartCount?: number;
+  agentLastExitCode?: number;
+  agentLastExitAt?: string;
+  agentLastCrashAt?: string;
+  agentCrashMessage?: string;
   createdAt: string;
   updatedAt: string;
 }

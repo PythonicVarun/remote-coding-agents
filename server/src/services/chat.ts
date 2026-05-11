@@ -4,49 +4,8 @@
 // `tmux send-keys -l "<text>"` writes the literal text (no escape parsing),
 // then a second call sends Enter so the agent receives a complete line.
 
-import { docker } from "./docker.js";
+import { execInContainer } from "./docker.js";
 import { badRequest, notFound } from "../lib/errors.js";
-
-async function execAndWait(
-  containerId: string,
-  cmd: string[],
-): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  const container = docker.getContainer(containerId);
-  const exec = await container.exec({
-    Cmd: cmd,
-    AttachStdout: true,
-    AttachStderr: true,
-    Tty: false,
-  });
-  const stream = await exec.start({ hijack: true, stdin: false });
-
-  const stdoutChunks: Buffer[] = [];
-  const stderrChunks: Buffer[] = [];
-
-  // Docker multiplexes stdout/stderr in a header-framed stream when TTY=false.
-  await new Promise<void>((resolve, reject) => {
-    stream.on("data", (chunk: Buffer) => {
-      let offset = 0;
-      while (offset + 8 <= chunk.length) {
-        const streamType = chunk[offset];
-        const size = chunk.readUInt32BE(offset + 4);
-        const payload = chunk.subarray(offset + 8, offset + 8 + size);
-        if (streamType === 1) stdoutChunks.push(payload);
-        else if (streamType === 2) stderrChunks.push(payload);
-        offset += 8 + size;
-      }
-    });
-    stream.on("end", () => resolve());
-    stream.on("error", reject);
-  });
-
-  const info = await exec.inspect();
-  return {
-    exitCode: info.ExitCode ?? 0,
-    stdout: Buffer.concat(stdoutChunks).toString("utf8"),
-    stderr: Buffer.concat(stderrChunks).toString("utf8"),
-  };
-}
 
 export async function sendChatToSession(containerId: string, text: string): Promise<void> {
   const cleaned = text.replace(/\r/g, "");
@@ -54,7 +13,7 @@ export async function sendChatToSession(containerId: string, text: string): Prom
   if (cleaned.length > 8000) throw badRequest("message too long (max 8000 chars)");
 
   // Send the literal text, then Enter. -l means "literal" — no key parsing.
-  const lit = await execAndWait(containerId, [
+  const lit = await execInContainer(containerId, [
     "tmux",
     "send-keys",
     "-t",
@@ -68,7 +27,7 @@ export async function sendChatToSession(containerId: string, text: string): Prom
     }
     throw new Error(`tmux send-keys failed: ${lit.stderr.trim() || lit.stdout.trim()}`);
   }
-  const enter = await execAndWait(containerId, [
+  const enter = await execInContainer(containerId, [
     "tmux",
     "send-keys",
     "-t",

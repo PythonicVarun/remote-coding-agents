@@ -134,6 +134,7 @@ Restart `npm run dev` after editing `.env`.
    - **Container**: a fresh container for this session, or attach to the project's existing container (sessions sharing one container share the same tmux pane).
    - **Initial task**: optional. If you provide one, the backend injects it into the agent terminal automatically once the session is up.
 4. **Watch and steer.** The terminal pane shows the agent's commands live; the file tree highlights writes; the chat panel sends typed instructions into the pane.
+   - If the agent CLI exits or crashes, the container automatically relaunches it in resume/continue mode and the web UI shows a restart popup.
 5. **Stop the session.** Hover the session card and click the trash icon — the container is stopped and removed.
 
 ## Security notes

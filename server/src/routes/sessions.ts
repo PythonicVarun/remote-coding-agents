@@ -4,6 +4,7 @@ import {
   createAndStartSession,
   stopAndDeleteSession,
 } from "../services/session-manager.js";
+import { syncProjectSessions, syncSessionRuntime } from "../services/agent-runtime.js";
 import { getSession, listSessions } from "../store/sessions.js";
 import { getProject } from "../store/projects.js";
 import { sendChatToSession } from "../services/chat.js";
@@ -20,6 +21,7 @@ sessionsRouter.get<ProjectParam>("/", async (req, res, next) => {
   try {
     const projectId = req.params.projectId;
     await getProject(projectId); // 404 if missing
+    await syncProjectSessions(projectId);
     res.json(await listSessions(projectId));
   } catch (err) {
     next(err);
@@ -53,6 +55,7 @@ sessionsRouter.post<ProjectParam>("/", async (req, res, next) => {
 
 sessionsRouter.get<ProjectAndSessionParam>("/:sessionId", async (req, res, next) => {
   try {
+    await syncSessionRuntime(req.params.sessionId);
     res.json(await getSession(req.params.sessionId));
   } catch (err) {
     next(err);

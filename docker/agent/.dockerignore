@@ -1,3 +1,4 @@
 *
 !Dockerfile
+!agent-supervisor.sh
 !entrypoint.sh

@@ -1,6 +1,7 @@
 // Mirrors the shapes returned by the backend. Keep in sync with server/src/store/state.ts.
 
 export type AgentKind = "claude" | "codex" | "gemini" | "copilot" | "shell";
+export type AgentState = "idle" | "running" | "restarting" | "stopped";
 
 export interface AgentMeta {
   kind: AgentKind;
@@ -58,6 +59,12 @@ export interface Session {
   ttydPort?: number;
   status: SessionStatus;
   lastError?: string;
+  agentState?: AgentState;
+  agentRestartCount?: number;
+  agentLastExitCode?: number;
+  agentLastExitAt?: string;
+  agentLastCrashAt?: string;
+  agentCrashMessage?: string;
   createdAt: string;
   updatedAt: string;
 }

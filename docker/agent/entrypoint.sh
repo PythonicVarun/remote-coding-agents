@@ -22,66 +22,28 @@ AGENT_KIND="${AGENT_KIND:-shell}"
 TTYD_PORT="${TTYD_PORT:-7681}"
 TMUX_SESSION="agent"
 
-# Resolve the inner command for each agent kind. Each branch tries the CLI,
-# falls back to a friendly message + bash if the CLI isn't installed, and
-# always ends in `exec bash -l` so the user can keep working after the
-# agent exits.
-make_inner() {
-  local cli="$1"
-  local args="$2"
-  local install_hint="$3"
-  if command -v "$cli" >/dev/null 2>&1; then
-    if [[ -n "${INITIAL_CMD:-}" ]]; then
-      printf 'cd /workspace && %s %s %s; exec bash -l' \
-        "$cli" "$args" "${INITIAL_CMD@Q}"
-    else
-      printf 'cd /workspace && (%s %s || true); exec bash -l' \
-        "$cli" "$args"
-    fi
-  else
-    printf 'echo "[agent] %s CLI not installed in this image. %s"; cd /workspace; exec bash -l' \
-      "$cli" "$install_hint"
-  fi
-}
-
-case "$AGENT_KIND" in
-  claude)
-    INNER_CMD=$(make_inner "claude" "--dangerously-skip-permissions" \
-      "Install with: sudo npm install -g @anthropic-ai/claude-code")
-    ;;
-  codex)
-    INNER_CMD=$(make_inner "codex" "--yolo" \
-      "Install with: sudo npm install -g @openai/codex")
-    ;;
-  gemini)
-    INNER_CMD=$(make_inner "gemini" "--yolo" \
-      "Install with: sudo npm install -g @google/gemini-cli")
-    ;;
-  copilot)
-    INNER_CMD=$(make_inner "copilot" "--yolo" \
-      "Install with: sudo npm install -g @github/copilot")
-    ;;
-  shell|*)
-    if [[ -n "${INITIAL_CMD:-}" ]]; then
-      INNER_CMD="cd /workspace && ${INITIAL_CMD}; exec bash -l"
-    else
-      INNER_CMD="cd /workspace; exec bash -l"
-    fi
-    ;;
-esac
-
 echo "[entrypoint] AGENT_KIND=$AGENT_KIND TTYD_PORT=$TTYD_PORT"
 
-# Start (or re-create) the tmux session running the inner command.
+# Start (or re-create) the tmux session running the shell or the agent
+# supervisor. The supervisor keeps the interactive agent alive and resumes the
+# latest conversation if the user exits the CLI or it crashes.
 tmux kill-session -t "$TMUX_SESSION" 2>/dev/null || true
-tmux new-session -d -s "$TMUX_SESSION" -x 200 -y 50 bash -lc "$INNER_CMD"
+if [[ "$AGENT_KIND" == "shell" ]]; then
+  if [[ -n "${INITIAL_CMD:-}" ]]; then
+    INNER_CMD="cd /workspace && ${INITIAL_CMD}; exec bash -l"
+  else
+    INNER_CMD="cd /workspace; exec bash -l"
+  fi
+  tmux new-session -d -s "$TMUX_SESSION" -x 200 -y 50 bash -lc "$INNER_CMD"
+else
+  tmux new-session -d -s "$TMUX_SESSION" -x 200 -y 50 /usr/local/bin/agent-supervisor.sh
+fi
 
 TTYD_ARGS=(
   --writable
   --port "$TTYD_PORT"
   --interface 0.0.0.0
   --max-clients 4
-  --check-origin=false
   --terminal-type xterm-256color
 )
 if [[ -n "${TTYD_AUTH:-}" ]]; then

@@ -1,5 +1,6 @@
 import Docker from "dockerode";
 import os from "node:os";
+import { PassThrough } from "node:stream";
 import { config } from "../config.js";
 import { serverError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
@@ -148,6 +149,43 @@ export async function stopAndRemoveContainer(
 export async function inspectContainer(containerId: string) {
   const c = docker.getContainer(containerId);
   return c.inspect();
+}
+
+export interface ExecResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
+export async function execInContainer(containerId: string, cmd: string[]): Promise<ExecResult> {
+  const container = docker.getContainer(containerId);
+  const exec = await container.exec({
+    Cmd: cmd,
+    AttachStdout: true,
+    AttachStderr: true,
+    Tty: false,
+  });
+  const stream = await exec.start({ hijack: true, stdin: false });
+  const stdoutStream = new PassThrough();
+  const stderrStream = new PassThrough();
+  docker.modem.demuxStream(stream, stdoutStream, stderrStream);
+
+  const stdoutChunks: Buffer[] = [];
+  const stderrChunks: Buffer[] = [];
+
+  await new Promise<void>((resolve, reject) => {
+    stdoutStream.on("data", (chunk: Buffer) => stdoutChunks.push(chunk));
+    stderrStream.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
+    stream.on("end", () => resolve());
+    stream.on("error", reject);
+  });
+
+  const info = await exec.inspect();
+  return {
+    exitCode: info.ExitCode ?? 0,
+    stdout: Buffer.concat(stdoutChunks).toString("utf8"),
+    stderr: Buffer.concat(stderrChunks).toString("utf8"),
+  };
 }
 
 /**

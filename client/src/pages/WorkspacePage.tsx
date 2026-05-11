@@ -34,18 +34,23 @@ export function WorkspacePage() {
       return;
     }
     let stopped = false;
+    let timer: number | undefined;
     const tick = async () => {
       try {
         const list = await api.listSessions(projectId);
         if (stopped) return;
         setSelectedSession(list.find((s) => s.id === selectedSessionId) ?? null);
+        timer = window.setTimeout(tick, 4000);
       } catch {
-        /* ignore */
+        if (!stopped) {
+          timer = window.setTimeout(tick, 4000);
+        }
       }
     };
     void tick();
     return () => {
       stopped = true;
+      if (timer) window.clearTimeout(timer);
     };
   }, [projectId, selectedSessionId]);
 
