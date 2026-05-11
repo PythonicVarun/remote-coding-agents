@@ -188,7 +188,7 @@ async function configureEnv() {
     AGENT_IMAGE: current.AGENT_IMAGE ?? "rca-agent:latest",
     TTYD_PORT_MIN: answers.TTYD_PORT_MIN.trim(),
     TTYD_PORT_MAX: answers.TTYD_PORT_MAX.trim(),
-    ANTHROPIC_API_KEY: answers.ANTHROPIC_API_KEY.trim(),
+    ANTHROPIC_API_KEY: (answers.ANTHROPIC_API_KEY ?? "").trim(),
   };
   writeDotEnv(merged);
   log.success(`Wrote ${path.relative(repoRoot, envFile)}`);
