@@ -8,7 +8,7 @@ import {
   listSessions,
   updateSession,
 } from "../store/sessions.js";
-import type { AgentKind, ContainerStrategy, Session } from "../store/state.js";
+import { AGENT_KINDS, type AgentKind, type ContainerStrategy, type Session } from "../store/state.js";
 import {
   ensureAgentImage,
   startSessionContainer,
@@ -27,8 +27,8 @@ export interface CreateSessionInput {
 }
 
 export async function createAndStartSession(input: CreateSessionInput): Promise<Session> {
-  if (!["claude", "shell"].includes(input.agent)) {
-    throw badRequest("agent must be 'claude' or 'shell'");
+  if (!AGENT_KINDS.includes(input.agent)) {
+    throw badRequest(`agent must be one of ${AGENT_KINDS.join(", ")}`);
   }
   if (!["per-session", "per-project"].includes(input.containerStrategy)) {
     throw badRequest("containerStrategy must be 'per-session' or 'per-project'");

@@ -124,7 +124,12 @@ function writeDotEnv(values) {
     `AGENT_IMAGE=${values.AGENT_IMAGE}`,
     `TTYD_PORT_MIN=${values.TTYD_PORT_MIN}`,
     `TTYD_PORT_MAX=${values.TTYD_PORT_MAX}`,
+    "",
+    "# Agent credentials — only the key matching the chosen agent is forwarded.",
     `ANTHROPIC_API_KEY=${values.ANTHROPIC_API_KEY ?? ""}`,
+    `OPENAI_API_KEY=${values.OPENAI_API_KEY ?? ""}`,
+    `GEMINI_API_KEY=${values.GEMINI_API_KEY ?? ""}`,
+    `GITHUB_TOKEN=${values.GITHUB_TOKEN ?? ""}`,
   ];
   writeFileSync(envFile, lines.join("\n") + "\n", "utf8");
 }
@@ -171,9 +176,27 @@ async function configureEnv() {
           }),
         ANTHROPIC_API_KEY: () =>
           text({
-            message: "ANTHROPIC_API_KEY (leave blank to skip — Claude sessions will fail without it)",
+            message: "ANTHROPIC_API_KEY (Claude — leave blank to skip)",
             placeholder: "sk-ant-...",
             initialValue: current.ANTHROPIC_API_KEY ?? "",
+          }),
+        OPENAI_API_KEY: () =>
+          text({
+            message: "OPENAI_API_KEY (Codex — leave blank to skip)",
+            placeholder: "sk-...",
+            initialValue: current.OPENAI_API_KEY ?? "",
+          }),
+        GEMINI_API_KEY: () =>
+          text({
+            message: "GEMINI_API_KEY (Gemini — leave blank to skip)",
+            placeholder: "AIza...",
+            initialValue: current.GEMINI_API_KEY ?? "",
+          }),
+        GITHUB_TOKEN: () =>
+          text({
+            message: "GITHUB_TOKEN (Copilot — leave blank to skip)",
+            placeholder: "ghp_...",
+            initialValue: current.GITHUB_TOKEN ?? "",
           }),
       },
       { onCancel: () => bailOnCancel("__cancel__") },
@@ -189,6 +212,9 @@ async function configureEnv() {
     TTYD_PORT_MIN: answers.TTYD_PORT_MIN.trim(),
     TTYD_PORT_MAX: answers.TTYD_PORT_MAX.trim(),
     ANTHROPIC_API_KEY: (answers.ANTHROPIC_API_KEY ?? "").trim(),
+    OPENAI_API_KEY: (answers.OPENAI_API_KEY ?? "").trim(),
+    GEMINI_API_KEY: (answers.GEMINI_API_KEY ?? "").trim(),
+    GITHUB_TOKEN: (answers.GITHUB_TOKEN ?? "").trim(),
   };
   writeDotEnv(merged);
   log.success(`Wrote ${path.relative(repoRoot, envFile)}`);

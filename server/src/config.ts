@@ -40,7 +40,17 @@ export const config = {
   agentImage: process.env.AGENT_IMAGE?.trim() || "rca-agent:latest",
   ttydPortMin: envInt("TTYD_PORT_MIN", 7700),
   ttydPortMax: envInt("TTYD_PORT_MAX", 7800),
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY?.trim() || "",
+  // Credentials forwarded to agent containers, scoped by agent kind. Only the
+  // matching key is passed into a session's environment; nothing else leaks.
+  apiKeys: {
+    anthropic: process.env.ANTHROPIC_API_KEY?.trim() || "",
+    openai: process.env.OPENAI_API_KEY?.trim() || "",
+    gemini:
+      process.env.GEMINI_API_KEY?.trim() ||
+      process.env.GOOGLE_API_KEY?.trim() ||
+      "",
+    github: process.env.GITHUB_TOKEN?.trim() || "",
+  },
   // Allow the frontend origin during dev. Tighten in prod.
   corsOrigin: process.env.CORS_ORIGIN?.trim() || "*",
 } as const;

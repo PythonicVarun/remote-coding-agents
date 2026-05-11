@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Bot, Plus, Trash2, TerminalSquare } from "lucide-react";
 import { api } from "@/lib/api";
-import type { AgentKind, ContainerStrategy, Session } from "@/lib/types";
+import { AGENTS, type AgentKind, type ContainerStrategy, type Session } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Dialog } from "@/components/ui/Dialog";
@@ -83,10 +83,10 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
                   )}
                 >
                   <span className="mt-0.5">
-                    {s.agent === "claude" ? (
-                      <Bot className="h-4 w-4 text-accent" />
-                    ) : (
+                    {s.agent === "shell" ? (
                       <TerminalSquare className="h-4 w-4 text-fg-muted" />
+                    ) : (
+                      <Bot className="h-4 w-4 text-accent" />
                     )}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -169,12 +169,15 @@ function CreateSessionDialog({ open, projectId, onClose, onCreated }: CreateSess
     }
   }, [open]);
 
+  const agentMeta = AGENTS.find((a) => a.kind === agent);
+
   const submit = async () => {
     setBusy(true);
     setError(null);
     try {
+      const fallbackTitle = agentMeta ? `${agentMeta.label} session` : "Session";
       const s = await api.createSession(projectId, {
-        title: title.trim() || `${agent === "claude" ? "Claude" : "Shell"} session`,
+        title: title.trim() || fallbackTitle,
         agent,
         containerStrategy: strategy,
       });
@@ -216,9 +219,15 @@ function CreateSessionDialog({ open, projectId, onClose, onCreated }: CreateSess
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-fg-muted">Agent</span>
           <Select value={agent} onChange={(e) => setAgent(e.target.value as AgentKind)}>
-            <option value="claude">Claude Code (YOLO mode)</option>
-            <option value="shell">Bare shell</option>
+            {AGENTS.map((a) => (
+              <option key={a.kind} value={a.kind}>
+                {a.label}
+              </option>
+            ))}
           </Select>
+          {agentMeta ? (
+            <span className="mt-1 block text-[11px] text-fg-subtle">{agentMeta.description}</span>
+          ) : null}
         </label>
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-fg-muted">Container</span>

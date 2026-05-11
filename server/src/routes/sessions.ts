@@ -32,7 +32,7 @@ sessionsRouter.post<ProjectParam>("/", async (req, res, next) => {
     const body = z
       .object({
         title: z.string().min(1).max(120),
-        agent: z.enum(["claude", "shell"]),
+        agent: z.enum(["claude", "codex", "gemini", "copilot", "shell"]),
         containerStrategy: z.enum(["per-session", "per-project"]),
       })
       .parse(req.body);

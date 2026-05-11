@@ -58,9 +58,19 @@ RUN ARCH="$(dpkg --print-architecture)" \
         "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.${TTYD_ARCH}" \
     && chmod +x /usr/local/bin/ttyd
 
-# Claude Code CLI — optional but useful default
-RUN npm install -g @anthropic-ai/claude-code || \
-    echo "warning: claude-code install failed at build time; can be installed at runtime"
+# Coding-agent CLIs — best effort. Each install is independent so a single
+# package failure doesn't block the others. Users can also install at runtime
+# inside a session (the agent user has passwordless sudo).
+RUN set -eu; \
+    for pkg in \
+        @anthropic-ai/claude-code \
+        @openai/codex \
+        @google/gemini-cli \
+        @github/copilot ; do \
+      echo ">>> installing $pkg"; \
+      npm install -g --no-fund --no-audit "$pkg" \
+        || echo "warning: failed to install $pkg (install at runtime if needed)"; \
+    done
 
 # Non-root user with passwordless sudo
 RUN useradd -m -s /bin/bash -u 1000 agent \

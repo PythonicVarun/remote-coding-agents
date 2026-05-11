@@ -38,7 +38,7 @@ npm run docker:build-agent   # rebuild the agent container image
 | **npm** | ships with Node 20 | Workspaces are used to manage `server/` and `client/`. |
 | **Docker** | recent | Each session spawns a container. On Windows/macOS use Docker Desktop. On Linux make sure your user is in the `docker` group. |
 | **Ports** | 4000, 5173, 7700-7800 | All configurable via `.env`. The 7700-7800 range is for ttyd per session — adjust if you need more concurrent sessions. |
-| **ANTHROPIC_API_KEY** | optional | Required only for sessions of type **Claude Code**. Bare-shell sessions don't need it. |
+| **Agent API keys** | optional | Required only for the matching agent — see "Supported agents" below. Bare-shell sessions don't need any. |
 
 > **Windows users:** Docker Desktop must be running before you create sessions. WSL2 backend is recommended.
 
@@ -91,6 +91,20 @@ remote-coding-agents/
 
 The agent runs inside a detached `tmux` session called `agent`. `ttyd` *attaches* to that session for the user's terminal, which lets us also use `tmux send-keys` from `docker exec` to inject text from the web chat panel. Both the iframe terminal and the chat go through the same pty — so you can type interactively in one and send a prompt from the other.
 
+## Supported agents
+
+Each session picks one agent at creation time. The agent image installs all of these at build time on a best-effort basis; missing CLIs can still be installed at runtime inside a session (the `agent` user has passwordless sudo).
+
+| Agent | CLI | Default flags | Credential env var |
+| --- | --- | --- | --- |
+| **Claude Code** | `claude` (`@anthropic-ai/claude-code`) | `--dangerously-skip-permissions` | `ANTHROPIC_API_KEY` |
+| **Codex** | `codex` (`@openai/codex`) | `--full-auto` | `OPENAI_API_KEY` |
+| **Gemini CLI** | `gemini` (`@google/gemini-cli`) | `--yolo` | `GEMINI_API_KEY` or `GOOGLE_API_KEY` |
+| **GitHub Copilot CLI** | `copilot` (`@github/copilot`) | `--allow-all-tools` | `GITHUB_TOKEN` |
+| **Bare shell** | `bash` | — | none |
+
+Only the credential matching the selected agent is forwarded into the container. If you need to change a flag, edit `docker/agent/entrypoint.sh` and rebuild the image (`npm run docker:build-agent`).
+
 ## Configuration (`.env`)
 
 All knobs live in `.env`. `scripts/setup.mjs` writes one for you the first time. The full list:
@@ -104,6 +118,9 @@ AGENT_IMAGE=rca-agent:latest      # docker image tag for the agent container
 TTYD_PORT_MIN=7700                # host port range used to publish each session's ttyd
 TTYD_PORT_MAX=7800
 ANTHROPIC_API_KEY=                # required for Claude Code sessions
+OPENAI_API_KEY=                   # required for Codex sessions
+GEMINI_API_KEY=                   # required for Gemini sessions (GOOGLE_API_KEY also accepted)
+GITHUB_TOKEN=                     # required for GitHub Copilot CLI sessions
 ```
 
 Restart `npm run dev` after editing `.env`.
@@ -113,7 +130,7 @@ Restart `npm run dev` after editing `.env`.
 1. **Create a project.** This makes a folder under `projects/<slug>/`. Place any starter files there manually if you want, or let the agent create them.
 2. **Open the project.** The workspace appears with the live file tree on the left.
 3. **Create a session.** Choose:
-   - **Agent**: Claude Code (YOLO) or bare shell.
+   - **Agent**: Claude Code, Codex, Gemini CLI, GitHub Copilot CLI, or bare shell.
    - **Container**: a fresh container for this session, or attach to the project's existing container (sessions sharing one container share the same tmux pane).
 4. **Watch and steer.** The terminal pane shows the agent's commands live; the file tree highlights writes; the chat panel sends typed instructions into the pane.
 5. **Stop the session.** Hover the session card and click the trash icon — the container is stopped and removed.

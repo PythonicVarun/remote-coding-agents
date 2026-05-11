@@ -1,6 +1,41 @@
 // Mirrors the shapes returned by the backend. Keep in sync with server/src/store/state.ts.
 
-export type AgentKind = "claude" | "shell";
+export type AgentKind = "claude" | "codex" | "gemini" | "copilot" | "shell";
+
+export interface AgentMeta {
+  kind: AgentKind;
+  label: string;
+  description: string;
+}
+
+export const AGENTS: AgentMeta[] = [
+  {
+    kind: "claude",
+    label: "Claude Code (YOLO)",
+    description: "Anthropic · runs with --dangerously-skip-permissions. Needs ANTHROPIC_API_KEY.",
+  },
+  {
+    kind: "codex",
+    label: "Codex (full-auto)",
+    description: "OpenAI · runs with --full-auto. Needs OPENAI_API_KEY.",
+  },
+  {
+    kind: "gemini",
+    label: "Gemini CLI (YOLO)",
+    description: "Google · runs with --yolo. Needs GEMINI_API_KEY or GOOGLE_API_KEY.",
+  },
+  {
+    kind: "copilot",
+    label: "GitHub Copilot CLI",
+    description: "GitHub · uses gh / GITHUB_TOKEN auth.",
+  },
+  {
+    kind: "shell",
+    label: "Bare shell",
+    description: "No agent — just bash. Install whatever CLI you want at session start.",
+  },
+];
+
 export type ContainerStrategy = "per-session" | "per-project";
 export type SessionStatus = "creating" | "running" | "stopped" | "error";
 

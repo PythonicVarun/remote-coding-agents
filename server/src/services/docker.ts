@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import { serverError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { allocatePort, releasePort, reservePort } from "./ports.js";
+import type { AgentKind } from "../store/state.js";
 
 const log = logger("docker");
 
@@ -36,11 +37,34 @@ export interface StartContainerOpts {
   name: string;
   /** Absolute host path to bind into /workspace. */
   hostProjectPath: string;
-  agent: "claude" | "shell";
+  agent: AgentKind;
   /** Optional initial command passed to entrypoint via env. */
   initialCmd?: string;
   /** Optional ttyd basic-auth credential. */
   ttydAuth?: string;
+}
+
+/** Translate agent kind into the env vars its CLI looks for. */
+function credentialEnvForAgent(agent: AgentKind): string[] {
+  switch (agent) {
+    case "claude":
+      return config.apiKeys.anthropic
+        ? [`ANTHROPIC_API_KEY=${config.apiKeys.anthropic}`]
+        : [];
+    case "codex":
+      return config.apiKeys.openai
+        ? [`OPENAI_API_KEY=${config.apiKeys.openai}`]
+        : [];
+    case "gemini": {
+      const k = config.apiKeys.gemini;
+      // gemini-cli reads either name; pass both so the user doesn't have to care.
+      return k ? [`GEMINI_API_KEY=${k}`, `GOOGLE_API_KEY=${k}`] : [];
+    }
+    case "copilot":
+      return config.apiKeys.github ? [`GITHUB_TOKEN=${config.apiKeys.github}`] : [];
+    case "shell":
+      return [];
+  }
 }
 
 export interface StartedContainer {
@@ -63,12 +87,10 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
   const env: string[] = [
     `AGENT_KIND=${opts.agent}`,
     `TTYD_PORT=7681`,
+    ...credentialEnvForAgent(opts.agent),
   ];
   if (opts.initialCmd) env.push(`INITIAL_CMD=${opts.initialCmd}`);
   if (opts.ttydAuth) env.push(`TTYD_AUTH=${opts.ttydAuth}`);
-  if (opts.agent === "claude" && config.anthropicApiKey) {
-    env.push(`ANTHROPIC_API_KEY=${config.anthropicApiKey}`);
-  }
 
   const mountSrc = dockerSrcPath(opts.hostProjectPath);
 

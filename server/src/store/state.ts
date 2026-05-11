@@ -8,7 +8,14 @@ import { logger } from "../lib/logger.js";
 
 const log = logger("store");
 
-export type AgentKind = "claude" | "shell";
+export type AgentKind = "claude" | "codex" | "gemini" | "copilot" | "shell";
+export const AGENT_KINDS: readonly AgentKind[] = [
+  "claude",
+  "codex",
+  "gemini",
+  "copilot",
+  "shell",
+] as const;
 export type ContainerStrategy = "per-session" | "per-project";
 
 export interface Project {
