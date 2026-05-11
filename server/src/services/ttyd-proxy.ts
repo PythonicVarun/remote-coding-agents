@@ -21,6 +21,7 @@ const log = logger("ttyd-proxy");
 const proxy = httpProxy.createProxyServer({
   ws: true,
   changeOrigin: true,
+  prependPath: false,
   xfwd: false,
 });
 
@@ -38,8 +39,8 @@ proxy.on("error", (err, _req, res) => {
 function parseSessionFromPath(url: string): { sessionId: string; rest: string } | null {
   // Strip leading slash, split into segments.
   const trimmed = url.replace(/^\/+/, "");
-  // Expect: <id>/<rest...>
-  const m = /^([A-Za-z0-9_-]+)(\/.*)?$/.exec(trimmed);
+  // Match either "ttyd/<id>/<rest...>" (from server upgrade) or "<id>/<rest...>" (from Express)
+  const m = /^(?:ttyd\/)?([A-Za-z0-9_-]+)(\/.*)?$/.exec(trimmed);
   if (!m) return null;
   return { sessionId: m[1]!, rest: m[2] ?? "/" };
 }
