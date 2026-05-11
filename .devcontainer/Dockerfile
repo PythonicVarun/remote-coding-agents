@@ -1,7 +1,4 @@
-FROM ubuntu:26.04
-
-# Prevent interactive prompts during installation
-ENV DEBIAN_FRONTEND=noninteractive
+FROM mcr.microsoft.com/devcontainers/base:ubuntu24.04
 
 # Install core tools, Python, and ttyd
 RUN apt-get update && apt-get install -y \
