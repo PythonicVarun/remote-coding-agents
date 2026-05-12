@@ -44,6 +44,10 @@ export interface StartContainerOpts {
   agent: AgentKind;
   /** Optional initial command passed to entrypoint via env. */
   initialCmd?: string;
+  /** Start the agent CLI in its resume/latest-conversation mode when supported. */
+  resumeLatest?: boolean;
+  /** Optional persistent host directory mounted as HOME inside the container. */
+  hostAgentHomePath?: string;
   /** Optional ttyd basic-auth credential. */
   ttydAuth?: string;
 }
@@ -251,6 +255,7 @@ async function probeDockerBindSource(
 async function selectWritableDockerBindSource(
   localProjectPath: string,
   containerUser: string | undefined,
+  label = "project directory",
 ): Promise<string> {
   const markerName = `.rca-mount-probe-${process.pid}-${Date.now()}-${randomUUID()}`;
   const markerValue = randomUUID();
@@ -259,7 +264,7 @@ async function selectWritableDockerBindSource(
   try {
     await fs.writeFile(markerPath, markerValue, "utf8");
   } catch (err) {
-    throw serverError("project directory is not writable on the host", {
+    throw serverError(`${label} is not writable on the host`, {
       path: localProjectPath,
       cause: String(err),
     });
@@ -282,7 +287,7 @@ async function selectWritableDockerBindSource(
       failures.push(failure);
     }
 
-    throw serverError("project directory is not writable inside the container", {
+    throw serverError(`${label} is not writable inside the container`, {
       localProjectPath,
       candidates: failures,
     });
@@ -310,6 +315,13 @@ async function resolveContainerUser(hostProjectPath: string): Promise<string | u
   return undefined;
 }
 
+async function ensureBindSourceWritable(localPath: string): Promise<void> {
+  await fs.mkdir(localPath, { recursive: true });
+  if (os.platform() !== "win32") {
+    await fs.chmod(localPath, 0o777);
+  }
+}
+
 export async function startSessionContainer(opts: StartContainerOpts): Promise<StartedContainer> {
   await ensureDockerReady();
   await ensureAgentImage();
@@ -323,17 +335,42 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
     ...credentialEnvForAgent(opts.agent),
   ];
   if (opts.initialCmd) env.push(`INITIAL_CMD=${opts.initialCmd}`);
+  if (opts.resumeLatest) env.push("RCA_AGENT_START_MODE=resume");
+  if (opts.hostAgentHomePath) env.push("HOME=/rca-home");
   if (opts.ttydAuth) env.push(`TTYD_AUTH=${opts.ttydAuth}`);
 
   let mountSrc: string;
+  let homeMountSrc: string | undefined;
   try {
     mountSrc = await selectWritableDockerBindSource(opts.hostProjectPath, containerUser);
+    if (opts.hostAgentHomePath) {
+      await ensureBindSourceWritable(opts.hostAgentHomePath);
+      homeMountSrc = await selectWritableDockerBindSource(
+        opts.hostAgentHomePath,
+        containerUser,
+        "agent home directory",
+      );
+    }
   } catch (err) {
     releasePort(hostPort);
     throw err;
   }
 
-  log.info("creating container", { name: opts.name, hostPort, mountSrc, agent: opts.agent });
+  const mounts: Docker.MountSettings[] = [
+    { Type: "bind", Source: mountSrc, Target: "/workspace" },
+  ];
+  if (homeMountSrc) {
+    mounts.push({ Type: "bind", Source: homeMountSrc, Target: "/rca-home" });
+  }
+
+  log.info("creating container", {
+    name: opts.name,
+    hostPort,
+    mountSrc,
+    homeMountSrc,
+    agent: opts.agent,
+    resumeLatest: opts.resumeLatest,
+  });
 
   let container: Docker.Container | undefined;
   try {
@@ -348,7 +385,7 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
       ExposedPorts: { [internalPort]: {} },
       HostConfig: {
         AutoRemove: false,
-        Mounts: [{ Type: "bind", Source: mountSrc, Target: "/workspace" }],
+        Mounts: mounts,
         PortBindings: {
           [internalPort]: [{ HostPort: String(hostPort), HostIp: "127.0.0.1" }],
         },

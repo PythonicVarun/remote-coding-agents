@@ -14,6 +14,7 @@ import {
   startSessionContainer,
   stopAndRemoveContainer,
 } from "./docker.js";
+import { agentHomePathForSession } from "./agent-home.js";
 import { ensureProjectTreeWritable } from "./project-permissions.js";
 import { sendChatToSession } from "./chat.js";
 import { logger } from "../lib/logger.js";
@@ -113,6 +114,7 @@ export async function createAndStartSession(input: CreateSessionInput): Promise<
       name: containerName,
       hostProjectPath: project.path,
       agent: input.agent,
+      hostAgentHomePath: agentHomePathForSession(session),
     });
     let running = await updateSession(session.id, {
       status: "running",

@@ -7,6 +7,7 @@
 #   TTYD_PORT    = port ttyd binds inside the container (default: 7681)
 #   TTYD_AUTH    = "user:pass" for ttyd basic auth (optional)
 #   INITIAL_CMD  = optional command to execute in the spawned shell
+#   RCA_AGENT_START_MODE = "start" | "resume" for agent CLIs (default: start)
 #
 # Layout:
 #   The agent runs inside a detached tmux session called "agent".

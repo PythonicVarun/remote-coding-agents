@@ -136,12 +136,14 @@ Restart `npm run dev` after editing `.env`.
    - **Container**: a fresh container for this session, or attach to the project's existing container (sessions sharing one container share the same tmux pane).
    - **Initial task**: optional. If you provide one, the backend injects it into the agent terminal automatically once the session is up.
 4. **Watch and steer.** The terminal pane shows the agent's commands live; the file tree highlights writes; the chat panel sends typed instructions into the pane.
-   - If the agent CLI exits or crashes, it is relaunched in resume/continue mode; if the whole session container exits, the backend restarts that same session container automatically. Both cases show a restart popup in the UI.
+   - If the agent CLI exits or crashes, it is relaunched in resume/continue mode; if the whole session container or terminal runtime exits, the backend restarts that session automatically and mounts the same persisted agent home so supported CLIs can resume the latest conversation. Both cases show a restart popup in the UI.
 5. **Stop the session.** Hover the session card and click the trash icon — the container is stopped and removed.
 
 At session startup the backend checks that Docker is mounting the same project directory the server sees, then performs a small write probe inside `/workspace`. On normal local hosts and Docker Desktop, the project path is used directly. When the backend itself runs inside a Linux container, it also derives Docker-visible path candidates from `/proc/self/mountinfo` and known same-filesystem checkout aliases, then verifies them with a marker file before starting the real session. For remote or custom Docker-outside-of-Docker setups where the daemon sees different absolute paths, set `DOCKER_HOST_WORKSPACE_ROOT` or `DOCKER_HOST_PROJECTS_ROOT`.
 
 UI-created containers run as the image's `agent` user by default. On POSIX hosts, session startup maps the container process to the project directory owner (`uid:gid`) when available; otherwise it falls back to the image default user, with no fixed host-specific UID/GID requirement.
+
+Agent CLI state is stored under `DATA_ROOT/agent-homes/` and mounted as the container's `HOME`. This keeps resume metadata available across automatic container restarts without writing it into the project folder.
 
 ## Security notes
 

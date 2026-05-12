@@ -5,6 +5,7 @@ import {
   stopAndRemoveContainer,
 } from "./docker.js";
 import { releasePort } from "./ports.js";
+import { agentHomePathForSession } from "./agent-home.js";
 import { getSession, listSessions, updateSession } from "../store/sessions.js";
 import { getProject } from "../store/projects.js";
 import { logger } from "../lib/logger.js";
@@ -25,6 +26,16 @@ interface RuntimeSnapshot {
 
 function changed(session: Session, patch: Partial<Session>): boolean {
   return Object.entries(patch).some(([key, value]) => session[key as keyof Session] !== value);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function recoveryDedupeKey(session: Session, oldContainerId: string): string {
+  return session.containerStrategy === "per-project"
+    ? `${session.projectId}:${oldContainerId}`
+    : `${session.id}:${oldContainerId}`;
 }
 
 async function readRuntimeSnapshot(containerId: string): Promise<RuntimeSnapshot | null> {
@@ -90,13 +101,28 @@ async function updateSessionsForContainer(
   return current ?? session;
 }
 
-async function recoverStoppedContainer(session: Session, exitCode?: number): Promise<Session> {
+async function hasInteractiveRuntime(containerId: string): Promise<boolean> {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const result = await execInContainer(containerId, ["tmux", "has-session", "-t", "agent"]);
+      if (result.exitCode === 0) return true;
+    } catch {
+      return false;
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await sleep(250);
+  }
+  return false;
+}
+
+async function recoverSessionContainer(
+  session: Session,
+  opts: { exitCode?: number; reason?: string },
+): Promise<Session> {
   if (session.status !== "running" || !session.containerId) return session;
   const oldContainerId = session.containerId;
-  const dedupeKey =
-    session.containerStrategy === "per-project"
-      ? `${session.projectId}:${oldContainerId}`
-      : `${session.id}:${oldContainerId}`;
+  const dedupeKey = recoveryDedupeKey(session, oldContainerId);
 
   const existingRecovery = recoveryInFlight.get(dedupeKey);
   if (existingRecovery) {
@@ -106,9 +132,11 @@ async function recoverStoppedContainer(session: Session, exitCode?: number): Pro
 
   const recovery = (async () => {
     const now = new Date().toISOString();
-    const reason = `session container exited${
-      typeof exitCode === "number" ? ` (code ${exitCode})` : ""
-    }; restarted automatically`;
+    const reason =
+      opts.reason ??
+      `session container exited${
+        typeof opts.exitCode === "number" ? ` (code ${opts.exitCode})` : ""
+      }; restarted automatically`;
 
     try {
       await stopAndRemoveContainer(oldContainerId, session.ttydPort).catch((err) => {
@@ -123,6 +151,8 @@ async function recoverStoppedContainer(session: Session, exitCode?: number): Pro
         name: `rca-${session.id}`,
         hostProjectPath: project.path,
         agent: session.agent,
+        resumeLatest: session.agent !== "shell",
+        hostAgentHomePath: agentHomePathForSession(session),
       });
       await updateSessionsForContainer(session, oldContainerId, (current) => ({
         status: "running",
@@ -138,6 +168,7 @@ async function recoverStoppedContainer(session: Session, exitCode?: number): Pro
         sessionId: session.id,
         oldContainerId,
         newContainerId: containerId,
+        reason,
       });
     } catch (err) {
       await updateSessionsForContainer(session, oldContainerId, () => ({
@@ -164,6 +195,10 @@ async function recoverStoppedContainer(session: Session, exitCode?: number): Pro
   return getSession(session.id).catch(() => session);
 }
 
+async function recoverStoppedContainer(session: Session, exitCode?: number): Promise<Session> {
+  return recoverSessionContainer(session, { exitCode });
+}
+
 async function syncOne(session: Session): Promise<Session> {
   if (!session.containerId) return session;
 
@@ -172,6 +207,12 @@ async function syncOne(session: Session): Promise<Session> {
     if (!inspection.State?.Running) {
       releasePort(session.ttydPort);
       return recoverStoppedContainer(session, inspection.State?.ExitCode);
+    }
+
+    if (!(await hasInteractiveRuntime(session.containerId))) {
+      return recoverSessionContainer(session, {
+        reason: "session terminal runtime stopped; restarted automatically",
+      });
     }
 
     if (session.agent === "shell") {

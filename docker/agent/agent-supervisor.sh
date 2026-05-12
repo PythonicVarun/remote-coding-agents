@@ -123,10 +123,18 @@ run_agent() {
 }
 
 restart_count=0
-mode="start"
+mode="${RCA_AGENT_START_MODE:-start}"
+case "$mode" in
+  start|resume) ;;
+  *) mode="start" ;;
+esac
 
 write_status "running" "$restart_count"
-echo "[supervisor] starting $AGENT_KIND in /workspace"
+if [[ "$mode" == "resume" ]]; then
+  echo "[supervisor] resuming $AGENT_KIND in /workspace"
+else
+  echo "[supervisor] starting $AGENT_KIND in /workspace"
+fi
 
 while true; do
   if run_agent "$mode"; then

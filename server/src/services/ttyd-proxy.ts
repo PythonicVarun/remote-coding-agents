@@ -13,7 +13,7 @@ import type { IncomingMessage } from "node:http";
 import type { Server } from "node:http";
 import type { Socket } from "node:net";
 import httpProxy from "http-proxy";
-import { getSession } from "../store/sessions.js";
+import { syncSessionRuntime } from "./agent-runtime.js";
 import { logger } from "../lib/logger.js";
 
 const log = logger("ttyd-proxy");
@@ -47,7 +47,7 @@ function parseSessionFromPath(url: string): { sessionId: string; rest: string } 
 
 async function resolveTarget(sessionId: string): Promise<string | null> {
   try {
-    const session = await getSession(sessionId);
+    const session = await syncSessionRuntime(sessionId);
     if (session.status !== "running" || !session.ttydPort) return null;
     return `http://127.0.0.1:${session.ttydPort}`;
   } catch {

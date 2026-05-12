@@ -74,7 +74,7 @@ sessionsRouter.delete<ProjectAndSessionParam>("/:sessionId", async (req, res, ne
 sessionsRouter.post<ProjectAndSessionParam>("/:sessionId/chat", async (req, res, next) => {
   try {
     const body = z.object({ text: z.string().min(1).max(8000) }).parse(req.body);
-    const session = await getSession(req.params.sessionId);
+    const session = await syncSessionRuntime(req.params.sessionId);
     if (session.status !== "running" || !session.containerId) {
       throw badRequest("session is not running");
     }

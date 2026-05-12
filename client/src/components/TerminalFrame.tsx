@@ -12,7 +12,8 @@ export function TerminalFrame({ projectId, sessionId }: TerminalFrameProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Poll the session record briefly until it transitions to running.
+  // Keep the selected session fresh. This lets the iframe reconnect when a
+  // crashed container is recovered with a new container id / ttyd port.
   useEffect(() => {
     if (!sessionId) {
       setSession(null);
@@ -23,16 +24,14 @@ export function TerminalFrame({ projectId, sessionId }: TerminalFrameProps) {
 
     const tick = async () => {
       try {
-        const list = await api.listSessions(projectId);
-        const s = list.find((x) => x.id === sessionId) ?? null;
+        const s = await api.getSession(projectId, sessionId);
         if (stopped) return;
         setSession(s);
         setError(null);
-        if (s && s.status === "creating") {
-          timer = window.setTimeout(tick, 800);
-        }
+        timer = window.setTimeout(tick, s.status === "creating" ? 800 : 2500);
       } catch (e) {
         if (!stopped) setError(e instanceof Error ? e.message : "failed to load session");
+        timer = window.setTimeout(tick, 2500);
       }
     };
     void tick();
@@ -80,9 +79,15 @@ export function TerminalFrame({ projectId, sessionId }: TerminalFrameProps) {
 
   // ttyd is being reverse-proxied at /ttyd/<sessionId>/...
   const src = `/ttyd/${session.id}/`;
+  const iframeKey = [
+    session.id,
+    session.containerId ?? "",
+    session.ttydPort ?? "",
+    session.recoveryCount ?? 0,
+  ].join(":");
   return (
     <iframe
-      key={session.id}
+      key={iframeKey}
       src={src}
       title={`Terminal for ${session.title}`}
       className="h-full w-full border-0 bg-bg"
