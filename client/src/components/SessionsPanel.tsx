@@ -15,16 +15,20 @@ interface SessionsPanelProps {
   onSelect: (id: string) => void;
 }
 
+interface CrashNotice {
+  kind: "agent" | "container";
+  sessionTitle: string;
+  message: string;
+  restartedAt?: string;
+}
+
 export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanelProps) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [crashNotice, setCrashNotice] = useState<{
-    sessionTitle: string;
-    message: string;
-    restartedAt?: string;
-  } | null>(null);
+  const [crashNotice, setCrashNotice] = useState<CrashNotice | null>(null);
   const seenRestartCounts = useRef<Map<string, number>>(new Map());
+  const seenRecoveryCounts = useRef<Map<string, number>>(new Map());
   const isFirstLoad = useRef(true);
 
   const reload = async () => {
@@ -34,22 +38,43 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
       setError(null);
       if (isFirstLoad.current) {
         seenRestartCounts.current = new Map(list.map((s) => [s.id, s.agentRestartCount ?? 0]));
+        seenRecoveryCounts.current = new Map(list.map((s) => [s.id, s.recoveryCount ?? 0]));
         isFirstLoad.current = false;
       } else {
+        let nextRecoveryNotice: CrashNotice | null = null;
+        let nextAgentNotice: CrashNotice | null = null;
         for (const session of list) {
+          const previousRecovery = seenRecoveryCounts.current.get(session.id) ?? 0;
+          const currentRecovery = session.recoveryCount ?? 0;
+          if (currentRecovery > previousRecovery && !nextRecoveryNotice) {
+            nextRecoveryNotice = {
+              kind: "container",
+              sessionTitle: session.title,
+              message:
+                session.recoveryMessage ??
+                "The session container stopped unexpectedly and was restarted automatically.",
+              restartedAt: session.lastRecoveryAt,
+            };
+          }
           const previous = seenRestartCounts.current.get(session.id) ?? 0;
           const current = session.agentRestartCount ?? 0;
-          if (current > previous && session.agent !== "shell") {
-            setCrashNotice({
+          if (current > previous && session.agent !== "shell" && !nextAgentNotice) {
+            nextAgentNotice = {
+              kind: "agent",
               sessionTitle: session.title,
               message:
                 session.agentCrashMessage ??
                 "The agent exited and was automatically resumed in the latest conversation.",
               restartedAt: session.agentLastCrashAt,
-            });
+            };
           }
         }
+        const nextNotice = nextRecoveryNotice ?? nextAgentNotice;
+        if (nextNotice) {
+          setCrashNotice(nextNotice);
+        }
         seenRestartCounts.current = new Map(list.map((s) => [s.id, s.agentRestartCount ?? 0]));
+        seenRecoveryCounts.current = new Map(list.map((s) => [s.id, s.recoveryCount ?? 0]));
       }
       if (!selectedId && list.length > 0 && list[0]) onSelect(list[0].id);
     } catch (e) {
@@ -60,6 +85,7 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
   useEffect(() => {
     isFirstLoad.current = true;
     seenRestartCounts.current = new Map();
+    seenRecoveryCounts.current = new Map();
     setCrashNotice(null);
     void reload();
     const poll = window.setInterval(() => void reload(), 4000);
@@ -127,6 +153,9 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
                       {typeof s.agentRestartCount === "number" && s.agentRestartCount > 0 ? (
                         <Badge tone="warning">resumed {s.agentRestartCount}</Badge>
                       ) : null}
+                      {typeof s.recoveryCount === "number" && s.recoveryCount > 0 ? (
+                        <Badge tone="warning">recovered {s.recoveryCount}</Badge>
+                      ) : null}
                       {s.agentState === "restarting" ? (
                         <Badge tone="warning">restarting</Badge>
                       ) : null}
@@ -167,8 +196,12 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
       <Dialog
         open={Boolean(crashNotice)}
         onClose={() => setCrashNotice(null)}
-        title="Agent Restarted"
-        description="The running agent exited or crashed. The container resumed the latest conversation automatically."
+        title={crashNotice?.kind === "container" ? "Container Restarted" : "Agent Restarted"}
+        description={
+          crashNotice?.kind === "container"
+            ? "The session container stopped unexpectedly and was restarted automatically."
+            : "The running agent exited or crashed and was resumed automatically."
+        }
         footer={
           <Button variant="primary" onClick={() => setCrashNotice(null)}>
             Dismiss
@@ -178,7 +211,7 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
         <div className="space-y-3 text-sm text-fg-muted">
           <p>
             <span className="font-medium text-fg">{crashNotice?.sessionTitle}</span>
-            {" "}was restarted in resume mode.
+            {" "}was restarted automatically.
           </p>
           <div className="rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-xs text-warning">
             {crashNotice?.message}

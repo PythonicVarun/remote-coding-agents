@@ -134,7 +134,7 @@ Restart `npm run dev` after editing `.env`.
    - **Container**: a fresh container for this session, or attach to the project's existing container (sessions sharing one container share the same tmux pane).
    - **Initial task**: optional. If you provide one, the backend injects it into the agent terminal automatically once the session is up.
 4. **Watch and steer.** The terminal pane shows the agent's commands live; the file tree highlights writes; the chat panel sends typed instructions into the pane.
-   - If the agent CLI exits or crashes, the container automatically relaunches it in resume/continue mode and the web UI shows a restart popup.
+   - If the agent CLI exits or crashes, it is relaunched in resume/continue mode; if the whole session container exits, the backend restarts that same session container automatically. Both cases show a restart popup in the UI.
 5. **Stop the session.** Hover the session card and click the trash icon — the container is stopped and removed.
 
 At session startup the backend performs a small write probe inside `/workspace`. If the bind-mounted project directory is not writable, session creation fails early instead of letting the agent run without syncing changes back to the host.
@@ -152,7 +152,7 @@ UI-created containers run as the image's `agent` user by default. On POSIX hosts
 
 - **"agent image rca-agent:latest not found"** — Run `npm run docker:build-agent`.
 - **"could not reach the Docker daemon"** — Start Docker Desktop (Windows/macOS) or `sudo systemctl start docker` (Linux). The backend reports this in the boot log; sessions will fail to create.
-- **ttyd iframe shows "session not running"** — The session container exited. Check `docker logs rca-<sessionId>` for the stack trace, then delete the session and create a new one.
+- **ttyd iframe shows "session not running" briefly** — The session container is being restarted after an unexpected exit. Wait a few seconds for recovery, then check the restart popup and session badge for details.
 - **Claude Code says it can't find an API key** — Set `ANTHROPIC_API_KEY` in `.env`, restart the backend, and create a fresh session. (Containers receive the key at creation time.)
 - **File tree doesn't update** — Make sure your platform supports inotify-style watches. On Windows, mount the project on a local NTFS volume rather than over a network share.
 - **Client build fails with a missing Rollup native package on Windows** — Re-run `npm install --workspaces --include-workspace-root`. This is usually an incomplete optional dependency install in `node_modules`, not a code issue.

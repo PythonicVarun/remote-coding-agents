@@ -65,6 +65,9 @@ export interface Session {
   agentLastExitAt?: string;
   agentLastCrashAt?: string;
   agentCrashMessage?: string;
+  recoveryCount?: number;
+  lastRecoveryAt?: string;
+  recoveryMessage?: string;
   createdAt: string;
   updatedAt: string;
 }
