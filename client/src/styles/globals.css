@@ -4,6 +4,9 @@
 
 :root {
   color-scheme: dark;
+  /* Firefox */
+  scrollbar-color: rgb(64 83 95 / 0.55) transparent;
+  scrollbar-width: thin;
 }
 
 html,
@@ -29,23 +32,48 @@ body {
   color: #f7fafc;
 }
 
-/* Scrollbar tuning to fit the graphite theme */
-::-webkit-scrollbar {
+/* Scrollbar tuning to fit the graphite theme. Applied with * so nested
+   scrollers inherit the look; the .scroll-thin utility shrinks the gutter
+   for dense panels (file tree, chat). */
+*::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
-::-webkit-scrollbar-track {
+*::-webkit-scrollbar-track {
   background: transparent;
 }
-::-webkit-scrollbar-thumb {
-  background-color: rgb(64 83 95 / 0.65);
-  border-radius: 5px;
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(64 83 95 / 0.55);
+  border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
+  transition: background-color 0.15s ease;
 }
-::-webkit-scrollbar-thumb:hover {
+*::-webkit-scrollbar-thumb:hover {
   background-color: rgb(47 124 246 / 0.55);
   background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:active {
+  background-color: rgb(47 124 246 / 0.85);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.scroll-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scroll-thin {
+  scrollbar-width: thin;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
 }
 
 /* Focus rings */
