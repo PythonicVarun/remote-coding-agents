@@ -33,6 +33,10 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
   const seenRestartCounts = useRef<Map<string, number>>(new Map());
   const seenRecoveryCounts = useRef<Map<string, number>>(new Map());
   const isFirstLoad = useRef(true);
+  const selectedIdRef = useRef(selectedId);
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
 
   const reload = async () => {
     try {
@@ -79,7 +83,7 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
         seenRestartCounts.current = new Map(list.map((s) => [s.id, s.agentRestartCount ?? 0]));
         seenRecoveryCounts.current = new Map(list.map((s) => [s.id, s.recoveryCount ?? 0]));
       }
-      if (!selectedId && list.length > 0 && list[0]) onSelect(list[0].id);
+      if (!selectedIdRef.current && list.length > 0 && list[0]) onSelect(list[0].id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "failed to load sessions");
     }
