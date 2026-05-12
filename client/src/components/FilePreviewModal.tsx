@@ -259,9 +259,11 @@ export function FilePreviewModal({
     const url = URL.createObjectURL(blob);
     popupUrlRef.current = url;
     const win = window.open(url, "_blank", "noopener,noreferrer");
-    if (!win) {
+    if (!win || win.closed || typeof win.closed === 'undefined') {
       // Popup blocked — surface a hint.
       setError("Popup blocked. Allow popups for this site to open the preview in a new window.");
+    } else {
+      win.focus();
     }
   };
 
