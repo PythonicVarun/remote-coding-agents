@@ -12,6 +12,7 @@ const envExample = path.join(repoRoot, ".env.example");
 
 const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
 const checkOnly = process.argv.includes("--check");
+const devMode = process.argv.includes("--dev");
 
 function color(code, text) {
   return `\x1b[${code}m${text}\x1b[0m`;
@@ -38,6 +39,11 @@ function readDotEnvValue(name) {
     if (match?.[1] === name) return match[2].trim();
   }
   return "";
+}
+
+function readPort(name, fallback) {
+  const raw = readDotEnvValue(name);
+  return /^\d+$/.test(raw) ? raw : fallback;
 }
 
 function ensureNodeVersion() {
@@ -106,6 +112,13 @@ function startChild(label, args) {
   return child;
 }
 
+function runCommand(label, args) {
+  return new Promise((resolve) => {
+    const child = startChild(label, args);
+    child.on("close", (code) => resolve(code ?? 1));
+  });
+}
+
 async function main() {
   ensureNodeVersion();
   ensureEnvFile();
@@ -113,11 +126,27 @@ async function main() {
   warnIfAgentImageMissing();
 
   if (checkOnly) {
-    info("Startup preflight passed.");
+    info(`Startup preflight passed (${devMode ? "dev" : "prod"} mode).`);
     return;
   }
 
-  info("Starting backend and frontend dev servers. Press Ctrl+C to stop both.");
+  if (!devMode) {
+    info("Building production bundles...");
+    const buildCode = await runCommand("build", ["run", "build"]);
+    if (buildCode !== 0) {
+      process.exit(buildCode);
+    }
+
+    const serverPort = readPort("SERVER_PORT", "4000");
+    info(`Starting production server on http://localhost:${serverPort}. Press Ctrl+C to stop.`);
+
+    const server = startChild("server", ["--workspace", "server", "run", "start"]);
+    server.on("close", (code) => process.exit(code ?? 0));
+    return;
+  }
+
+  const clientPort = readPort("CLIENT_PORT", "5173");
+  info(`Starting backend + frontend dev servers on http://localhost:${clientPort}. Press Ctrl+C to stop both.`);
 
   const children = [
     startChild("server", ["--workspace", "server", "run", "dev"]),

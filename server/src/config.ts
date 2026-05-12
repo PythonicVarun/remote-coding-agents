@@ -25,6 +25,8 @@ function resolvePath(value: string | undefined, fallback: string): string {
 
 const projectsRoot = resolvePath(process.env.PROJECTS_ROOT, "./projects");
 const dataRoot = resolvePath(process.env.DATA_ROOT, "./data");
+const clientDistRoot = path.join(repoRoot, "client", "dist");
+const clientIndexFile = path.join(clientDistRoot, "index.html");
 
 // Ensure runtime dirs exist on boot.
 for (const dir of [projectsRoot, dataRoot]) {
@@ -37,6 +39,8 @@ export const config = {
   clientPort: envInt("CLIENT_PORT", 5173),
   projectsRoot,
   dataRoot,
+  clientDistRoot,
+  clientIndexFile,
   agentImage: process.env.AGENT_IMAGE?.trim() || "rca-agent:latest",
   dockerHostWorkspaceRoot: process.env.DOCKER_HOST_WORKSPACE_ROOT?.trim() || "",
   dockerHostProjectsRoot: process.env.DOCKER_HOST_PROJECTS_ROOT?.trim() || "",

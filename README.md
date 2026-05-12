@@ -18,15 +18,16 @@ The agent (Claude Code by default) runs in YOLO mode (`--dangerously-skip-permis
 git clone <this-repo>
 cd remote-coding-agents
 npm run setup            # interactive TUI: checks prereqs, writes .env, installs, builds image
-npm start                # normal day-to-day startup: launches backend + frontend
+npm start                # default startup: build and serve the app in production mode
 ```
 
-Use `npm run setup` once after cloning. After that, use `npm start` for regular development startup. It reuses your existing install, seeds `.env` from `.env.example` if needed, warns if the agent image is missing, and launches both dev servers. Then open <http://localhost:5173>.
+Use `npm run setup` once after cloning. After that, use `npm start` for the normal startup path. It reuses your existing install, seeds `.env` from `.env.example` if needed, warns if the agent image is missing, builds the backend and frontend, and serves the web app from the backend on <http://localhost:4000>. Pass `--dev` to either script when you want the hot-reload backend and Vite dev server instead.
 
 If you'd rather drive it yourself after running setup once:
 
 ```bash
-npm run dev                  # same as npm start
+npm run dev                  # same as npm start -- --dev
+npm start -- --dev           # explicit dev mode
 npm --workspace server run dev  # backend only
 npm --workspace client run dev  # frontend only
 npm run build                # production build of both
@@ -66,7 +67,7 @@ remote-coding-agents/
 │   ├── Dockerfile       # ubuntu:24.04 + node 20 + git + tmux + ttyd + claude-code
 │   └── entrypoint.sh    # Starts agent inside detached tmux session; ttyd attaches
 ├── scripts/setup.mjs    # TUI bootstrap with @clack/prompts
-├── scripts/start.mjs    # lightweight everyday starter
+├── scripts/start.mjs    # app launcher (prod by default, dev with --dev)
 ├── projects/            # User project folders live here (gitignored)
 ├── data/                # JSON state lives here (gitignored)
 └── .env.example
@@ -116,7 +117,7 @@ All knobs live in `.env`. `scripts/setup.mjs` writes one for you the first time.
 
 ```ini
 SERVER_PORT=4000
-CLIENT_PORT=5173
+CLIENT_PORT=5173               # frontend dev port only; prod serves from SERVER_PORT
 PROJECTS_ROOT=./projects          # where project folders live (absolute or repo-relative)
 DATA_ROOT=./data                  # where state.json is persisted
 AGENT_IMAGE=rca-agent:latest      # docker image tag for the agent container
@@ -169,8 +170,9 @@ Agent CLI state is stored under `DATA_ROOT/agent-homes/` and mounted as the cont
 ## Development
 
 ```bash
-npm start                       # lightweight everyday startup
-npm run dev                     # alias of npm start
+npm start                       # build and serve backend + web in production mode
+npm start -- --dev              # backend + frontend with hot reload
+npm run dev                     # alias of npm start -- --dev
 npm --workspace server run dev  # backend only (tsx watch)
 npm --workspace client run dev  # frontend only (vite)
 npm --workspace server run lint # tsc --noEmit on server
@@ -179,7 +181,7 @@ npm run build                   # production build of both
 npm run start:server            # built backend only
 ```
 
-The Vite dev server proxies `/api`, `/socket.io`, and `/ttyd` to the backend, so the frontend at `:5173` looks like a single origin even though the backend runs on `:4000`.
+In production mode the backend serves the built client itself on `SERVER_PORT`. In dev mode the Vite dev server proxies `/api`, `/socket.io`, and `/ttyd` to the backend, so the frontend at `CLIENT_PORT` still behaves like a single origin.
 
 ## License
 

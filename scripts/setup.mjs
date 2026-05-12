@@ -9,7 +9,7 @@
 //   2. Seeds .env from .env.example, optionally prompting for ports / API key
 //   3. Installs npm dependencies (root + workspaces)
 //   4. Builds the agent Docker image
-//   5. Offers to launch `npm run dev`
+//   5. Offers to launch the app (production by default, dev with --dev)
 
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, copyFileSync, readFileSync, writeFileSync } from "node:fs";
@@ -20,6 +20,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..");
 const envFile = path.join(repoRoot, ".env");
 const envExample = path.join(repoRoot, ".env.example");
+const launchDev = process.argv.includes("--dev");
 
 // Bootstrap: @clack/prompts is a root devDep, so on a fresh clone it isn't
 // available until `npm install` has run. Try to import it; if it's missing,
@@ -307,20 +308,24 @@ async function buildAgentImage(env) {
   log.success("Agent image built.");
 }
 
-async function maybeStartDev() {
+async function maybeStartApp() {
+  const commandLabel = launchDev ? "`npm start -- --dev`" : "`npm start`";
+  const modeLabel = launchDev ? "dev servers (backend + frontend with hot reload)" : "production server (serves the built web app)";
+
   const choice = bailOnCancel(
     await select({
       message: "All set. What now?",
       options: [
-        { value: "dev", label: "Start dev servers (backend + frontend)" },
-        { value: "exit", label: "Exit — I'll run `npm run dev` myself" },
+        { value: "start", label: `Start ${modeLabel}` },
+        { value: "exit", label: `Exit — I'll run ${commandLabel} myself` },
       ],
-      initialValue: "dev",
+      initialValue: "start",
     }),
   );
   if (choice === "exit") return;
-  log.step("Launching `npm run dev` — Ctrl+C to stop.");
-  await exec("npm", ["run", "dev"], { inherit: true });
+  log.step(`Launching ${commandLabel} — Ctrl+C to stop.`);
+  const args = launchDev ? ["start", "--", "--dev"] : ["start"];
+  await exec("npm", args, { inherit: true });
 }
 
 async function main() {
@@ -333,8 +338,11 @@ async function main() {
       "  2. Create or update .env",
       "  3. Install npm dependencies",
       "  4. Build the agent Docker image",
-      "  5. Optionally launch dev servers",
+      `  5. Optionally launch the app (${launchDev ? "dev" : "production"} mode)`,
       "",
+      launchDev
+        ? "Pass no flag to launch the production build by default."
+        : "Pass --dev to launch the dev servers instead.",
       "You can skip any step.",
     ].join("\n"),
     "what happens next",
@@ -366,9 +374,12 @@ async function main() {
   } else {
     log.warn("Skipping agent image build because Docker is unavailable.");
   }
-  await maybeStartDev();
+  await maybeStartApp();
 
-  outro(color.green("Done. Open the app at " + color.cyan(`http://localhost:${env?.CLIENT_PORT ?? "5173"}`)));
+  const url = launchDev
+    ? `http://localhost:${env?.CLIENT_PORT ?? "5173"}`
+    : `http://localhost:${env?.SERVER_PORT ?? "4000"}`;
+  outro(color.green("Done. Open the app at " + color.cyan(url)));
 }
 
 main().catch((err) => {

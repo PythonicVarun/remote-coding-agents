@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import cors from "cors";
 import { config } from "./config.js";
@@ -12,6 +13,7 @@ const log = logger("app");
 
 export function buildApp(): Express {
   const app = express();
+  const hasBuiltClient = fs.existsSync(config.clientIndexFile);
 
   app.use(cors({ origin: config.corsOrigin, credentials: false }));
   app.use(express.json({ limit: "256kb" }));
@@ -30,6 +32,13 @@ export function buildApp(): Express {
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "not found" });
   });
+
+  if (hasBuiltClient) {
+    app.use(express.static(config.clientDistRoot));
+    app.get("*", (_req, res) => {
+      res.sendFile(config.clientIndexFile);
+    });
+  }
 
   // Centralized error handler
   app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
