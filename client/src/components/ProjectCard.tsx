@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Folder, MoreHorizontal, Trash2 } from "lucide-react";
 import type { Project } from "@/lib/types";
 import { Badge } from "@/components/ui/Badge";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface ProjectCardProps {
   project: Project;
@@ -12,13 +13,19 @@ interface ProjectCardProps {
 export function ProjectCard({ project, onDelete }: ProjectCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ removeFiles: boolean } | null>(null);
 
-  const handleDelete = async (removeFiles: boolean) => {
+  const requestDelete = (removeFiles: boolean) => {
     setMenuOpen(false);
-    if (!confirm(removeFiles ? "Delete project AND its files on disk?" : "Remove this project from the list (files stay on disk)?")) return;
+    setPendingDelete({ removeFiles });
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
     setBusy(true);
     try {
-      await onDelete(project.id, removeFiles);
+      await onDelete(project.id, pendingDelete.removeFiles);
+      setPendingDelete(null);
     } finally {
       setBusy(false);
     }
@@ -50,7 +57,7 @@ export function ProjectCard({ project, onDelete }: ProjectCardProps) {
               onMouseLeave={() => setMenuOpen(false)}
             >
               <button
-                onClick={() => void handleDelete(false)}
+                onClick={() => requestDelete(false)}
                 disabled={busy}
                 className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-fg-muted hover:bg-bg-muted hover:text-fg"
               >
@@ -58,7 +65,7 @@ export function ProjectCard({ project, onDelete }: ProjectCardProps) {
                 Remove from list
               </button>
               <button
-                onClick={() => void handleDelete(true)}
+                onClick={() => requestDelete(true)}
                 disabled={busy}
                 className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-danger hover:bg-danger-subtle"
               >
@@ -78,6 +85,32 @@ export function ProjectCard({ project, onDelete }: ProjectCardProps) {
           Open →
         </Link>
       </div>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={pendingDelete?.removeFiles ? "Delete project and its files?" : "Remove project from list?"}
+        description={
+          pendingDelete?.removeFiles
+            ? "The project folder will be permanently deleted from disk."
+            : "The project will be removed from the list. Files on disk are untouched."
+        }
+        confirmLabel={pendingDelete?.removeFiles ? "Delete files" : "Remove"}
+        tone={pendingDelete?.removeFiles ? "danger" : "primary"}
+        busy={busy}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => (busy ? undefined : setPendingDelete(null))}
+      >
+        <div className="space-y-2 text-sm text-fg-muted">
+          <p>
+            <span className="font-medium text-fg">{project.name}</span>
+          </p>
+          <p className="truncate text-xs text-fg-subtle">{project.path}</p>
+          {pendingDelete?.removeFiles ? (
+            <div className="rounded-md border border-danger/30 bg-danger-subtle px-3 py-2 text-xs text-danger">
+              This cannot be undone.
+            </div>
+          ) : null}
+        </div>
+      </ConfirmDialog>
     </div>
   );
 }

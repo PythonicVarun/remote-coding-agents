@@ -5,6 +5,7 @@ import { AGENTS, type AgentKind, type ContainerStrategy, type Session } from "@/
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Dialog } from "@/components/ui/Dialog";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { cn } from "@/lib/cn";
@@ -27,6 +28,8 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [crashNotice, setCrashNotice] = useState<CrashNotice | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Session | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const seenRestartCounts = useRef<Map<string, number>>(new Map());
   const seenRecoveryCounts = useRef<Map<string, number>>(new Map());
   const isFirstLoad = useRef(true);
@@ -93,14 +96,21 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Stop and remove this session?")) return;
+  const requestDelete = (session: Session) => setPendingDelete(session);
+
+  const confirmDelete = async () => {
+    const target = pendingDelete;
+    if (!target) return;
+    setDeleting(true);
     try {
-      await api.deleteSession(projectId, id);
-      if (selectedId === id) onSelect("");
+      await api.deleteSession(projectId, target.id);
+      if (selectedId === target.id) onSelect("");
       void reload();
+      setPendingDelete(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "delete failed");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -169,7 +179,7 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
                   <span
                     onClick={(e) => {
                       e.stopPropagation();
-                      void handleDelete(s.id);
+                      requestDelete(s);
                     }}
                     className="hidden h-6 w-6 shrink-0 items-center justify-center rounded text-fg-subtle hover:bg-bg-elevated hover:text-danger group-hover:inline-flex"
                     aria-label="Delete session"
@@ -223,6 +233,21 @@ export function SessionsPanel({ projectId, selectedId, onSelect }: SessionsPanel
           ) : null}
         </div>
       </Dialog>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title="Stop and remove session?"
+        description="The container is stopped and the session record is deleted."
+        message={
+          pendingDelete
+            ? `“${pendingDelete.title}” will be stopped and removed.`
+            : ""
+        }
+        confirmLabel="Delete"
+        tone="danger"
+        busy={deleting}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => (deleting ? undefined : setPendingDelete(null))}
+      />
     </div>
   );
 }

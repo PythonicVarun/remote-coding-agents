@@ -14,6 +14,7 @@ import { getSocket } from "@/lib/socket";
 import type { FsEvent, FsNode } from "@/lib/types";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
+import { PromptDialog } from "@/components/ui/PromptDialog";
 
 interface FileTreeProps {
   projectId: string;
@@ -33,6 +34,7 @@ export function FileTree({ projectId }: FileTreeProps) {
     loaded: number;
     size: number;
   } | null>(null);
+  const [newFolderParent, setNewFolderParent] = useState<string | null>(null);
 
   const dragCounter = useRef(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -154,17 +156,14 @@ export function FileTree({ projectId }: FileTreeProps) {
 
   const openPicker = () => fileInputRef.current?.click();
 
-  // Prompt for a folder name and create it inside `parentDir`. Auto-expands
-  // the parent so the new entry is visible after fs-watcher refreshes the tree.
-  const createFolder = useCallback(
-    async (parentDir: string) => {
-      const raw = window.prompt(
-        parentDir ? `New folder inside /${parentDir}` : "New folder name",
-        "",
-      );
-      if (raw == null) return;
-      const name = raw.trim();
-      if (!name) return;
+  // Open the themed PromptDialog for the given parent directory.
+  const openNewFolderDialog = useCallback((parentDir: string) => {
+    setNewFolderParent(parentDir);
+  }, []);
+
+  // Called after the user confirms a name in PromptDialog.
+  const submitNewFolder = useCallback(
+    async (parentDir: string, name: string) => {
       try {
         await api.mkdir(projectId, parentDir, name);
         setExpanded((prev) => {
@@ -173,8 +172,10 @@ export function FileTree({ projectId }: FileTreeProps) {
           return next;
         });
         void refresh();
+        setNewFolderParent(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : "failed to create folder");
+        setNewFolderParent(null);
       }
     },
     [projectId, refresh],
@@ -225,7 +226,7 @@ export function FileTree({ projectId }: FileTreeProps) {
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => void createFolder("")}
+            onClick={() => void openNewFolderDialog("")}
             aria-label="New folder"
             title="New folder"
           >
@@ -293,7 +294,7 @@ export function FileTree({ projectId }: FileTreeProps) {
               onToggle={() => toggle(entry.node.path)}
               onRowDragEnter={(path) => setDragOverPath(path)}
               onRowDrop={onContainerDrop}
-              onCreateChild={createFolder}
+              onCreateChild={openNewFolderDialog}
             />
           ))
         )}
@@ -305,6 +306,22 @@ export function FileTree({ projectId }: FileTreeProps) {
           </div>
         ) : null}
       </div>
+
+      <PromptDialog
+        open={newFolderParent !== null}
+        title="New folder"
+        description={
+          newFolderParent
+            ? `Create a folder inside /${newFolderParent}`
+            : "Create a folder in the project root."
+        }
+        label="Folder name"
+        placeholder="e.g. fixtures"
+        submitLabel="Create"
+        validate={(v) => (/[\\/]/.test(v) ? "Slashes are not allowed in a folder name." : null)}
+        onSubmit={(name) => void submitNewFolder(newFolderParent ?? "", name)}
+        onCancel={() => setNewFolderParent(null)}
+      />
     </div>
   );
 }
