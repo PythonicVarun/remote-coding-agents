@@ -189,4 +189,4 @@ In production mode the backend serves the built client itself on `SERVER_PORT`. 
 
 ## License
 
-TBD.
+MIT - see [`LICENSE`](LICENSE).
