@@ -23,6 +23,11 @@ TTYD_PORT="${TTYD_PORT:-7681}"
 TMUX_SESSION="agent"
 
 echo "[entrypoint] AGENT_KIND=$AGENT_KIND TTYD_PORT=$TTYD_PORT"
+CURRENT_HOME="${HOME:-}"
+if [[ -z "$CURRENT_HOME" || ! -d "$CURRENT_HOME" || ! -w "$CURRENT_HOME" ]]; then
+  HOME="$(mktemp -d /tmp/rca-home.XXXXXX)"
+  export HOME
+fi
 
 # Start (or re-create) the tmux session running the shell or the agent
 # supervisor. The supervisor keeps the interactive agent alive and resumes the

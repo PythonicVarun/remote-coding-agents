@@ -1,4 +1,5 @@
 import Docker from "dockerode";
+import fs from "node:fs/promises";
 import os from "node:os";
 import { PassThrough } from "node:stream";
 import { config } from "../config.js";
@@ -82,13 +83,32 @@ function dockerSrcPath(p: string): string {
   return p;
 }
 
+async function resolveContainerUser(hostProjectPath: string): Promise<string | undefined> {
+  if (os.platform() === "win32") return undefined;
+  try {
+    const stat = await fs.stat(hostProjectPath);
+    if (typeof stat.uid === "number" && typeof stat.gid === "number") {
+      return `${stat.uid}:${stat.gid}`;
+    }
+    log.warn("project uid/gid not numeric; using image default user", {
+      hostProjectPath,
+    });
+  } catch (err) {
+    log.warn("failed to inspect project ownership for container user mapping; using image default", {
+      hostProjectPath,
+      err: String(err),
+    });
+  }
+  return undefined;
+}
+
 export async function startSessionContainer(opts: StartContainerOpts): Promise<StartedContainer> {
   const hostPort = await allocatePort();
   const internalPort = "7681/tcp";
+  const containerUser = await resolveContainerUser(opts.hostProjectPath);
   const env: string[] = [
     `AGENT_KIND=${opts.agent}`,
     `TTYD_PORT=7681`,
-    "HOME=/home/agent",
     ...credentialEnvForAgent(opts.agent),
   ];
   if (opts.initialCmd) env.push(`INITIAL_CMD=${opts.initialCmd}`);
@@ -104,8 +124,8 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
       Image: config.agentImage,
       name: opts.name,
       Env: env,
-      // Run sessions as the image's dedicated agent user.
-      User: "24542:24542",
+      // Match bind-mounted project ownership on POSIX hosts for write access.
+      ...(containerUser ? { User: containerUser } : {}),
       Tty: true,
       OpenStdin: true,
       ExposedPorts: { [internalPort]: {} },
