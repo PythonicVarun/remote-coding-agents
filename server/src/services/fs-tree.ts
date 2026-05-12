@@ -118,3 +118,33 @@ export async function readFileSafe(
     await handle.close();
   }
 }
+
+/**
+ * Write `data` to <projectPath>/<relDir>/<name>. The destination directory must
+ * already exist and the resulting path must stay inside the project root. The
+ * filename itself may not contain path separators or `..`.
+ */
+export async function writeFileSafe(
+  projectPath: string,
+  relDir: string,
+  name: string,
+  data: Buffer,
+): Promise<{ path: string; size: number }> {
+  if (!name || name === "." || name === ".." || /[\\/]/.test(name)) {
+    throw badRequest("invalid filename");
+  }
+  const dirAbs = resolveSafe(projectPath, relDir);
+  const dirStat = await fs.stat(dirAbs).catch(() => null);
+  if (!dirStat || !dirStat.isDirectory()) {
+    throw badRequest("target is not a directory");
+  }
+  const fileAbs = path.join(dirAbs, name);
+  // Defence-in-depth: re-check we didn't escape via the joined filename.
+  const rel = path.relative(projectPath, fileAbs);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) {
+    throw badRequest("path escapes project root");
+  }
+  await fs.writeFile(fileAbs, data);
+  const st = await fs.stat(fileAbs);
+  return { path: rel.split(path.sep).join("/"), size: st.size };
+}

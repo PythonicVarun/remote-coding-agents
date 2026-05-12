@@ -88,6 +88,39 @@ export const api = {
     request<{ content: string; truncated: boolean; size: number }>(
       `/api/projects/${projectId}/fs/file?path=${encodeURIComponent(path)}`,
     ),
+
+  uploadFile: async (
+    projectId: string,
+    dir: string,
+    file: File,
+  ): Promise<{ path: string; size: number }> => {
+    const url =
+      `/api/projects/${projectId}/fs/upload` +
+      `?dir=${encodeURIComponent(dir)}&name=${encodeURIComponent(file.name)}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    const text = await res.text();
+    let payload: unknown;
+    try {
+      payload = text ? JSON.parse(text) : undefined;
+    } catch {
+      payload = text;
+    }
+    if (!res.ok) {
+      const msg =
+        payload && typeof payload === "object" && "error" in payload
+          ? String((payload as { error: unknown }).error)
+          : res.statusText;
+      throw new ApiError(res.status, msg, payload);
+    }
+    return payload as { path: string; size: number };
+  },
+
+  downloadFileUrl: (projectId: string, path: string) =>
+    `/api/projects/${projectId}/fs/download?path=${encodeURIComponent(path)}`,
 };
 
 export { ApiError };
