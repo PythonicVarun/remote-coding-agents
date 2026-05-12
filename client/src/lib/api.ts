@@ -89,34 +89,53 @@ export const api = {
       `/api/projects/${projectId}/fs/file?path=${encodeURIComponent(path)}`,
     ),
 
-  uploadFile: async (
+  // Uses XHR (not fetch) so the caller can observe upload progress via
+  // xhr.upload.onprogress — fetch() exposes no equivalent in browsers today.
+  uploadFile: (
     projectId: string,
     dir: string,
     file: File,
+    onProgress?: (loaded: number, total: number) => void,
   ): Promise<{ path: string; size: number }> => {
-    const url =
-      `/api/projects/${projectId}/fs/upload` +
-      `?dir=${encodeURIComponent(dir)}&name=${encodeURIComponent(file.name)}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "content-type": file.type || "application/octet-stream" },
-      body: file,
+    return new Promise((resolve, reject) => {
+      const url =
+        `/api/projects/${projectId}/fs/upload` +
+        `?dir=${encodeURIComponent(dir)}&name=${encodeURIComponent(file.name)}`;
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", url, true);
+      xhr.setRequestHeader(
+        "content-type",
+        file.type || "application/octet-stream",
+      );
+      if (onProgress) {
+        xhr.upload.onprogress = (e) => {
+          // Some browsers report total=0 until the first packet — fall back to file.size.
+          const total = e.lengthComputable && e.total > 0 ? e.total : file.size;
+          onProgress(e.loaded, total);
+        };
+      }
+      xhr.onload = () => {
+        const text = xhr.responseText;
+        let payload: unknown;
+        try {
+          payload = text ? JSON.parse(text) : undefined;
+        } catch {
+          payload = text;
+        }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(payload as { path: string; size: number });
+        } else {
+          const msg =
+            payload && typeof payload === "object" && payload && "error" in payload
+              ? String((payload as { error: unknown }).error)
+              : xhr.statusText || `HTTP ${xhr.status}`;
+          reject(new ApiError(xhr.status, msg, payload));
+        }
+      };
+      xhr.onerror = () => reject(new ApiError(0, "network error"));
+      xhr.onabort = () => reject(new ApiError(0, "aborted"));
+      xhr.send(file);
     });
-    const text = await res.text();
-    let payload: unknown;
-    try {
-      payload = text ? JSON.parse(text) : undefined;
-    } catch {
-      payload = text;
-    }
-    if (!res.ok) {
-      const msg =
-        payload && typeof payload === "object" && "error" in payload
-          ? String((payload as { error: unknown }).error)
-          : res.statusText;
-      throw new ApiError(res.status, msg, payload);
-    }
-    return payload as { path: string; size: number };
   },
 
   downloadFileUrl: (projectId: string, path: string) =>

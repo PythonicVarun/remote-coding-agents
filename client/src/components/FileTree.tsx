@@ -25,7 +25,13 @@ export function FileTree({ projectId }: FileTreeProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [flash, setFlash] = useState<Map<string, number>>(new Map());
   const [dragOverPath, setDragOverPath] = useState<string | null>(null);
-  const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
+  const [uploading, setUploading] = useState<{
+    index: number;
+    total: number;
+    name: string;
+    loaded: number;
+    size: number;
+  } | null>(null);
 
   const dragCounter = useRef(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -115,14 +121,24 @@ export function FileTree({ projectId }: FileTreeProps) {
   const uploadFiles = useCallback(
     async (files: File[], dir: string) => {
       if (files.length === 0) return;
-      setUploading({ done: 0, total: files.length });
       setError(null);
       try {
-        let done = 0;
-        for (const file of files) {
-          await api.uploadFile(projectId, dir, file);
-          done += 1;
-          setUploading({ done, total: files.length });
+        for (let i = 0; i < files.length; i += 1) {
+          const file = files[i]!;
+          setUploading({
+            index: i + 1,
+            total: files.length,
+            name: file.name,
+            loaded: 0,
+            size: file.size,
+          });
+          await api.uploadFile(projectId, dir, file, (loaded, size) => {
+            setUploading((prev) =>
+              prev && prev.name === file.name && prev.index === i + 1
+                ? { ...prev, loaded, size }
+                : prev,
+            );
+          });
         }
         // fs:watcher will fire and refresh, but kick one immediately for snappier UX.
         void refresh();
@@ -209,11 +225,7 @@ export function FileTree({ projectId }: FileTreeProps) {
         onChange={onPickerChange}
       />
 
-      {uploading ? (
-        <div className="border-b border-border-subtle bg-accent-subtle/40 px-3 py-1.5 text-xs text-accent-hover">
-          Uploading {uploading.done}/{uploading.total}…
-        </div>
-      ) : null}
+      {uploading ? <UploadProgress {...uploading} /> : null}
 
       <div
         className={cn(
@@ -275,6 +287,50 @@ function flatten(root: FsNode, expanded: Set<string>): FlattenedEntry[] {
   }
   visit(root, 0);
   return out;
+}
+
+interface UploadProgressProps {
+  index: number;
+  total: number;
+  name: string;
+  loaded: number;
+  size: number;
+}
+
+function UploadProgress({ index, total, name, loaded, size }: UploadProgressProps) {
+  const pct =
+    size > 0 ? Math.min(100, Math.round((loaded / size) * 100)) : 0;
+  return (
+    <div className="border-b border-border-subtle bg-accent-subtle/40 px-3 py-1.5 text-xs text-accent-hover">
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate font-mono" title={name}>
+          {name}
+        </span>
+        <span className="shrink-0 tabular-nums text-fg-muted">
+          {index}/{total} · {formatBytes(loaded)} / {formatBytes(size)} · {pct}%
+        </span>
+      </div>
+      <div className="mt-1 h-1 overflow-hidden rounded bg-bg-elevated">
+        <div
+          className="h-full bg-accent transition-[width] duration-100 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function formatBytes(n: number): string {
+  if (!Number.isFinite(n) || n < 0) return "0 B";
+  if (n < 1024) return `${n} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = n / 1024;
+  let i = 0;
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024;
+    i += 1;
+  }
+  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[i]}`;
 }
 
 interface TreeRowProps {
