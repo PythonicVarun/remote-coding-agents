@@ -39,6 +39,26 @@ fsRouter.get<ProjectParam>("/file", async (req, res, next) => {
   }
 });
 
+// Serve a project file raw to the browser (for inline previews).
+fsRouter.get<ProjectParam>("/raw", async (req, res, next) => {
+  try {
+    const project = await getProject(req.params.projectId);
+    const q = z.object({ path: z.string().min(1) }).parse(req.query);
+    const abs = resolveSafe(project.path, q.path);
+    const st = await fs.stat(abs);
+    if (!st.isFile()) {
+      res.status(400).json({ error: "not a file" });
+      return;
+    }
+    // sendFile handles content-type and byte-range requests automatically
+    res.sendFile(abs, (err) => {
+      if (err) next(err);
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Stream a project file to the browser as an attachment.
 fsRouter.get<ProjectParam>("/download", async (req, res, next) => {
   try {

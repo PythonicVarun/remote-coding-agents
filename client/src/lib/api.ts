@@ -143,6 +143,9 @@ export const api = {
   downloadFileUrl: (projectId: string, path: string) =>
     `/api/projects/${projectId}/fs/download?path=${encodeURIComponent(path)}`,
 
+  rawFileUrl: (projectId: string, path: string) =>
+    `/api/projects/${projectId}/fs/raw?path=${encodeURIComponent(path)}`,
+
   mkdir: (projectId: string, dir: string, name: string) =>
     request<{ path: string }>(`/api/projects/${projectId}/fs/mkdir`, {
       method: "POST",

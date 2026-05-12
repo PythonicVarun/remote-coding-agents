@@ -9,7 +9,7 @@ interface DialogProps {
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
-  width?: "sm" | "md" | "lg";
+  width?: "sm" | "md" | "lg" | "xl" | "full";
 }
 
 export function Dialog({ open, onClose, title, description, children, footer, width = "md" }: DialogProps) {
@@ -28,6 +28,8 @@ export function Dialog({ open, onClose, title, description, children, footer, wi
     sm: "max-w-sm",
     md: "max-w-md",
     lg: "max-w-2xl",
+    xl: "max-w-5xl",
+    full: "max-w-[95vw]",
   }[width];
 
   return (
