@@ -3,7 +3,6 @@ import {
   execInContainer,
   startSessionContainer,
   stopAndRemoveContainer,
-  verifyWorkspaceWritable,
 } from "./docker.js";
 import { releasePort } from "./ports.js";
 import { getSession, listSessions, updateSession } from "../store/sessions.js";
@@ -125,7 +124,6 @@ async function recoverStoppedContainer(session: Session, exitCode?: number): Pro
         hostProjectPath: project.path,
         agent: session.agent,
       });
-      await verifyWorkspaceWritable(containerId);
       await updateSessionsForContainer(session, oldContainerId, (current) => ({
         status: "running",
         containerId,

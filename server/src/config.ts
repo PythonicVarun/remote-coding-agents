@@ -38,6 +38,8 @@ export const config = {
   projectsRoot,
   dataRoot,
   agentImage: process.env.AGENT_IMAGE?.trim() || "rca-agent:latest",
+  dockerHostWorkspaceRoot: process.env.DOCKER_HOST_WORKSPACE_ROOT?.trim() || "",
+  dockerHostProjectsRoot: process.env.DOCKER_HOST_PROJECTS_ROOT?.trim() || "",
   ttydPortMin: envInt("TTYD_PORT_MIN", 7700),
   ttydPortMax: envInt("TTYD_PORT_MAX", 7800),
   // Credentials forwarded to agent containers, scoped by agent kind. Only the

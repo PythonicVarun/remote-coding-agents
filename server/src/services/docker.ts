@@ -1,9 +1,11 @@
 import Docker from "dockerode";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
+import path from "node:path";
 import { PassThrough } from "node:stream";
 import { config } from "../config.js";
-import { serverError } from "../lib/errors.js";
+import { HttpError, serverError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { allocatePort, releasePort, reservePort } from "./ports.js";
 import type { AgentKind } from "../store/state.js";
@@ -83,6 +85,212 @@ function dockerSrcPath(p: string): string {
   return p;
 }
 
+function isPathInside(parent: string, child: string): boolean {
+  const rel = path.relative(parent, child);
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+}
+
+function mapPathRoot(localPath: string, localRoot: string, dockerRoot: string): string | undefined {
+  if (!dockerRoot || !isPathInside(localRoot, localPath)) return undefined;
+  const rel = path.relative(localRoot, localPath);
+  return rel ? path.join(dockerRoot, rel) : dockerRoot;
+}
+
+async function sameFsEntry(a: string, b: string): Promise<boolean> {
+  try {
+    const [aStat, bStat] = await Promise.all([fs.stat(a), fs.stat(b)]);
+    return aStat.dev === bStat.dev && aStat.ino === bStat.ino;
+  } catch {
+    return false;
+  }
+}
+
+function decodeMountInfoPath(value: string): string {
+  return value.replace(/\\([0-7]{3})/g, (_, octal: string) =>
+    String.fromCharCode(Number.parseInt(octal, 8)),
+  );
+}
+
+interface MountInfoEntry {
+  root: string;
+  mountPoint: string;
+}
+
+async function readMountInfo(): Promise<MountInfoEntry[]> {
+  if (os.platform() === "win32") return [];
+
+  let raw: string;
+  try {
+    raw = await fs.readFile("/proc/self/mountinfo", "utf8");
+  } catch {
+    return [];
+  }
+
+  const entries: MountInfoEntry[] = [];
+  for (const line of raw.split("\n")) {
+    if (!line) continue;
+    const sep = line.indexOf(" - ");
+    if (sep < 0) continue;
+    const fields = line.slice(0, sep).split(" ");
+    const root = fields[3];
+    const mountPoint = fields[4];
+    if (!root || !mountPoint) continue;
+    entries.push({
+      root: decodeMountInfoPath(root),
+      mountPoint: decodeMountInfoPath(mountPoint),
+    });
+  }
+  return entries;
+}
+
+async function mountInfoCandidates(localProjectPath: string): Promise<string[]> {
+  const entries = await readMountInfo();
+  return entries
+    .filter((entry) => path.isAbsolute(entry.root) && isPathInside(entry.mountPoint, localProjectPath))
+    .sort((a, b) => b.mountPoint.length - a.mountPoint.length)
+    .map((entry) => {
+      const rel = path.relative(entry.mountPoint, localProjectPath);
+      return rel ? path.join(entry.root, rel) : entry.root;
+    });
+}
+
+async function localCheckoutAliasCandidates(localProjectPath: string): Promise<string[]> {
+  if (os.platform() === "win32" || !isPathInside(config.repoRoot, localProjectPath)) {
+    return [];
+  }
+
+  let entries: import("node:fs").Dirent[];
+  try {
+    entries = await fs.readdir("/workspaces", { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const rel = path.relative(config.repoRoot, localProjectPath);
+  const candidates: string[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const candidateRoot = path.join("/workspaces", entry.name);
+    // Some hosted/dev-container environments expose the same checkout at
+    // multiple absolute paths. Matching by device+inode keeps this specific
+    // to true aliases instead of guessing by directory name.
+    if (await sameFsEntry(config.repoRoot, candidateRoot)) {
+      candidates.push(rel ? path.join(candidateRoot, rel) : candidateRoot);
+    }
+  }
+  return candidates;
+}
+
+async function dockerBindSourceCandidates(localProjectPath: string): Promise<string[]> {
+  const candidates = [
+    mapPathRoot(localProjectPath, config.projectsRoot, config.dockerHostProjectsRoot),
+    mapPathRoot(localProjectPath, config.repoRoot, config.dockerHostWorkspaceRoot),
+    ...(await mountInfoCandidates(localProjectPath)),
+    ...(await localCheckoutAliasCandidates(localProjectPath)),
+    localProjectPath,
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const candidate of candidates) {
+    const src = dockerSrcPath(candidate);
+    if (seen.has(src)) continue;
+    seen.add(src);
+    unique.push(src);
+  }
+  return unique;
+}
+
+interface MountProbeFailure {
+  mountSrc: string;
+  statusCode?: number;
+  error?: string;
+}
+
+async function probeDockerBindSource(
+  mountSrc: string,
+  containerUser: string | undefined,
+  markerName: string,
+  markerValue: string,
+): Promise<MountProbeFailure | null> {
+  let container: Docker.Container | undefined;
+  try {
+    container = await docker.createContainer({
+      Image: config.agentImage,
+      ...(containerUser ? { User: containerUser } : {}),
+      Env: [`RCA_PROBE_MARKER=${markerName}`, `RCA_PROBE_VALUE=${markerValue}`],
+      Entrypoint: ["/bin/bash", "-lc"],
+      Cmd: [
+        [
+          "set -euo pipefail",
+          'marker="/workspace/${RCA_PROBE_MARKER}"',
+          'if [[ ! -f "$marker" ]]; then echo "project marker not visible in bind mount" >&2; exit 20; fi',
+          'actual="$(cat "$marker")"',
+          'if [[ "$actual" != "$RCA_PROBE_VALUE" ]]; then echo "project marker mismatch in bind mount" >&2; exit 21; fi',
+          'probe="/workspace/.rca-write-test-$$"',
+          'echo ok > "$probe"',
+          'rm -f "$probe"',
+        ].join("; "),
+      ],
+      HostConfig: {
+        AutoRemove: false,
+        Mounts: [{ Type: "bind", Source: mountSrc, Target: "/workspace" }],
+      },
+    });
+    await container.start();
+    const result = await container.wait();
+    if (result.StatusCode === 0) return null;
+    return { mountSrc, statusCode: result.StatusCode };
+  } catch (err) {
+    return { mountSrc, error: String(err) };
+  } finally {
+    if (container) await container.remove({ force: true }).catch(() => undefined);
+  }
+}
+
+async function selectWritableDockerBindSource(
+  localProjectPath: string,
+  containerUser: string | undefined,
+): Promise<string> {
+  const markerName = `.rca-mount-probe-${process.pid}-${Date.now()}-${randomUUID()}`;
+  const markerValue = randomUUID();
+  const markerPath = path.join(localProjectPath, markerName);
+
+  try {
+    await fs.writeFile(markerPath, markerValue, "utf8");
+  } catch (err) {
+    throw serverError("project directory is not writable on the host", {
+      path: localProjectPath,
+      cause: String(err),
+    });
+  }
+
+  try {
+    const candidates = await dockerBindSourceCandidates(localProjectPath);
+    const failures: MountProbeFailure[] = [];
+
+    for (const mountSrc of candidates) {
+      // eslint-disable-next-line no-await-in-loop
+      const failure = await probeDockerBindSource(mountSrc, containerUser, markerName, markerValue);
+      if (!failure) {
+        const localSrc = dockerSrcPath(localProjectPath);
+        if (mountSrc !== localSrc) {
+          log.info("using translated Docker bind source", { localProjectPath, mountSrc });
+        }
+        return mountSrc;
+      }
+      failures.push(failure);
+    }
+
+    throw serverError("project directory is not writable inside the container", {
+      localProjectPath,
+      candidates: failures,
+    });
+  } finally {
+    await fs.rm(markerPath, { force: true }).catch(() => undefined);
+  }
+}
+
 async function resolveContainerUser(hostProjectPath: string): Promise<string | undefined> {
   if (os.platform() === "win32") return undefined;
   try {
@@ -103,6 +311,9 @@ async function resolveContainerUser(hostProjectPath: string): Promise<string | u
 }
 
 export async function startSessionContainer(opts: StartContainerOpts): Promise<StartedContainer> {
+  await ensureDockerReady();
+  await ensureAgentImage();
+
   const hostPort = await allocatePort();
   const internalPort = "7681/tcp";
   const containerUser = await resolveContainerUser(opts.hostProjectPath);
@@ -114,11 +325,17 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
   if (opts.initialCmd) env.push(`INITIAL_CMD=${opts.initialCmd}`);
   if (opts.ttydAuth) env.push(`TTYD_AUTH=${opts.ttydAuth}`);
 
-  const mountSrc = dockerSrcPath(opts.hostProjectPath);
+  let mountSrc: string;
+  try {
+    mountSrc = await selectWritableDockerBindSource(opts.hostProjectPath, containerUser);
+  } catch (err) {
+    releasePort(hostPort);
+    throw err;
+  }
 
   log.info("creating container", { name: opts.name, hostPort, mountSrc, agent: opts.agent });
 
-  let container: Docker.Container;
+  let container: Docker.Container | undefined;
   try {
     container = await docker.createContainer({
       Image: config.agentImage,
@@ -131,7 +348,7 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
       ExposedPorts: { [internalPort]: {} },
       HostConfig: {
         AutoRemove: false,
-        Binds: [`${mountSrc}:/workspace:rw`],
+        Mounts: [{ Type: "bind", Source: mountSrc, Target: "/workspace" }],
         PortBindings: {
           [internalPort]: [{ HostPort: String(hostPort), HostIp: "127.0.0.1" }],
         },
@@ -142,8 +359,11 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
       },
     });
     await container.start();
+    await verifyWorkspaceWritable(container.id);
   } catch (err) {
+    if (container) await container.remove({ force: true }).catch(() => undefined);
     releasePort(hostPort);
+    if (err instanceof HttpError) throw err;
     throw serverError("failed to start agent container", { cause: String(err) });
   }
 
