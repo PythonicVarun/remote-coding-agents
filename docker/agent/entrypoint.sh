@@ -44,12 +44,23 @@ else
   tmux new-session -d -s "$TMUX_SESSION" -x 200 -y 50 /usr/local/bin/agent-supervisor.sh
 fi
 
+# xterm.js theme matches the website palette (graphite + restrained blue accent).
+# Colors: bg #0b1114, fg #e8eef2, accent #2f7cf6, success #31c48d,
+# warning #f2b84b, danger #f36d6d, border-strong #40535f.
+TTYD_THEME='{"background":"#0b1114","foreground":"#e8eef2","cursor":"#2f7cf6","cursorAccent":"#0b1114","selectionBackground":"#12233f","selectionForeground":"#f7fafc","black":"#10181d","red":"#f36d6d","green":"#31c48d","yellow":"#f2b84b","blue":"#2f7cf6","magenta":"#b58bf6","cyan":"#5cbfb8","white":"#a5b2bc","brightBlack":"#40535f","brightRed":"#ff8b8b","brightGreen":"#5ed3a8","brightYellow":"#ffc966","brightBlue":"#5a98f7","brightMagenta":"#d5acff","brightCyan":"#7fd9d2","brightWhite":"#e8eef2"}'
+
 TTYD_ARGS=(
   --writable
   --port "$TTYD_PORT"
   --interface 0.0.0.0
   --max-clients 4
   --terminal-type xterm-256color
+  -t "fontFamily=JetBrains Mono, Cascadia Code, Consolas, Menlo, monospace"
+  -t fontSize=13
+  -t cursorStyle=bar
+  -t cursorBlink=true
+  -t disableLeaveAlert=true
+  -t "theme=${TTYD_THEME}"
 )
 if [[ -n "${TTYD_AUTH:-}" ]]; then
   TTYD_ARGS+=(--credential "$TTYD_AUTH")

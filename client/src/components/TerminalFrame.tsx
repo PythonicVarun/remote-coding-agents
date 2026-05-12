@@ -85,7 +85,7 @@ export function TerminalFrame({ projectId, sessionId }: TerminalFrameProps) {
       key={session.id}
       src={src}
       title={`Terminal for ${session.title}`}
-      className="h-full w-full border-0 bg-black"
+      className="h-full w-full border-0 bg-bg"
       sandbox="allow-same-origin allow-scripts allow-forms allow-clipboard-read allow-clipboard-write"
     />
   );
