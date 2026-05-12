@@ -9,8 +9,10 @@
   ],
   "scripts": {
     "setup": "node scripts/setup.mjs",
+    "setup:dev": "node scripts/setup.mjs --dev",
     "start": "node scripts/start.mjs",
-    "dev": "node scripts/start.mjs --dev",
+    "start:dev": "node scripts/start.mjs --dev",
+    "dev": "npm run start:dev",
     "dev:server": "npm --workspace server run dev",
     "dev:client": "npm --workspace client run dev",
     "build": "npm --workspace server run build && npm --workspace client run build",

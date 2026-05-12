@@ -18,16 +18,19 @@ The agent (Claude Code by default) runs in YOLO mode (`--dangerously-skip-permis
 git clone <this-repo>
 cd remote-coding-agents
 npm run setup            # interactive TUI: checks prereqs, writes .env, installs, builds image
+npm run setup:dev        # same setup flow, but launches dev mode at the end
 npm start                # default startup: build and serve the app in production mode
+npm run start:dev        # start backend + frontend in dev mode
 ```
 
-Use `npm run setup` once after cloning. After that, use `npm start` for the normal startup path. It reuses your existing install, seeds `.env` from `.env.example` if needed, warns if the agent image is missing, builds the backend and frontend, and serves the web app from the backend on <http://localhost:4000>. Pass `--dev` to either script when you want the hot-reload backend and Vite dev server instead.
+Use `npm run setup` once after cloning. After that, use `npm start` for the normal startup path. It reuses your existing install, seeds `.env` from `.env.example` if needed, warns if the agent image is missing, builds the backend and frontend, and serves the web app from the backend on <http://localhost:4000>. Use `npm run setup:dev` or `npm run start:dev` when you want the hot-reload backend and Vite dev server instead.
 
 If you'd rather drive it yourself after running setup once:
 
 ```bash
-npm run dev                  # same as npm start -- --dev
-npm start -- --dev           # explicit dev mode
+npm run start:dev            # explicit dev mode
+npm run dev                  # alias of npm run start:dev
+npm run setup:dev            # setup flow + dev launch
 npm --workspace server run dev  # backend only
 npm --workspace client run dev  # frontend only
 npm run build                # production build of both
@@ -171,8 +174,9 @@ Agent CLI state is stored under `DATA_ROOT/agent-homes/` and mounted as the cont
 
 ```bash
 npm start                       # build and serve backend + web in production mode
-npm start -- --dev              # backend + frontend with hot reload
-npm run dev                     # alias of npm start -- --dev
+npm run start:dev               # backend + frontend with hot reload
+npm run dev                     # alias of npm run start:dev
+npm run setup:dev               # setup flow + dev launch
 npm --workspace server run dev  # backend only (tsx watch)
 npm --workspace client run dev  # frontend only (vite)
 npm --workspace server run lint # tsc --noEmit on server
