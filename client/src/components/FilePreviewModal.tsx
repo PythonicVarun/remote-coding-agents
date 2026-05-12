@@ -337,7 +337,7 @@ export function FilePreviewModal({
         </>
       }
     >
-      <div className={kind === "pdf" ? "h-[80vh]" : "h-[60vh] min-h-[320px]"}>
+      <div className={kind === "pdf" ? "h-[70vh]" : "h-[60vh] min-h-[320px]"}>
         {loading ? (
           <div className="flex h-full items-center justify-center text-sm text-fg-muted">
             Loading…
