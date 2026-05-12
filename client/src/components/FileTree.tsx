@@ -5,6 +5,7 @@ import {
   File as FileIcon,
   Folder,
   FolderOpen,
+  FolderPlus,
   RotateCw,
   Upload,
 } from "lucide-react";
@@ -153,6 +154,32 @@ export function FileTree({ projectId }: FileTreeProps) {
 
   const openPicker = () => fileInputRef.current?.click();
 
+  // Prompt for a folder name and create it inside `parentDir`. Auto-expands
+  // the parent so the new entry is visible after fs-watcher refreshes the tree.
+  const createFolder = useCallback(
+    async (parentDir: string) => {
+      const raw = window.prompt(
+        parentDir ? `New folder inside /${parentDir}` : "New folder name",
+        "",
+      );
+      if (raw == null) return;
+      const name = raw.trim();
+      if (!name) return;
+      try {
+        await api.mkdir(projectId, parentDir, name);
+        setExpanded((prev) => {
+          const next = new Set(prev);
+          next.add(parentDir);
+          return next;
+        });
+        void refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "failed to create folder");
+      }
+    },
+    [projectId, refresh],
+  );
+
   const onPickerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const list = e.target.files;
     if (!list) return;
@@ -195,6 +222,15 @@ export function FileTree({ projectId }: FileTreeProps) {
       <div className="flex items-center justify-between border-b border-border-subtle px-3 py-2">
         <div className="text-xs font-semibold uppercase tracking-wide text-fg-muted">Files</div>
         <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => void createFolder("")}
+            aria-label="New folder"
+            title="New folder"
+          >
+            <FolderPlus className="h-3.5 w-3.5" />
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -257,6 +293,7 @@ export function FileTree({ projectId }: FileTreeProps) {
               onToggle={() => toggle(entry.node.path)}
               onRowDragEnter={(path) => setDragOverPath(path)}
               onRowDrop={onContainerDrop}
+              onCreateChild={createFolder}
             />
           ))
         )}
@@ -342,6 +379,7 @@ interface TreeRowProps {
   onToggle: () => void;
   onRowDragEnter: (path: string) => void;
   onRowDrop: (e: React.DragEvent, targetDir: string) => void;
+  onCreateChild: (parentDir: string) => void | Promise<void>;
 }
 
 function TreeRow({
@@ -353,6 +391,7 @@ function TreeRow({
   onToggle,
   onRowDragEnter,
   onRowDrop,
+  onCreateChild,
 }: TreeRowProps) {
   const { node, depth } = entry;
   const isDir = node.type === "directory";
@@ -415,6 +454,23 @@ function TreeRow({
           {node.name || "/"}
         </span>
       </button>
+      {isDir ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            void onCreateChild(node.path);
+          }}
+          aria-label={`New folder inside ${node.name || "/"}`}
+          title="New folder"
+          className={cn(
+            "mr-1 hidden h-5 w-5 items-center justify-center rounded text-fg-subtle",
+            "hover:bg-bg-elevated hover:text-fg group-hover:flex focus-visible:flex",
+          )}
+        >
+          <FolderPlus className="h-3 w-3" />
+        </button>
+      ) : null}
       {!isDir && node.path ? (
         <a
           href={api.downloadFileUrl(projectId, node.path)}

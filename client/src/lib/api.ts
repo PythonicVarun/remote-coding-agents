@@ -140,6 +140,12 @@ export const api = {
 
   downloadFileUrl: (projectId: string, path: string) =>
     `/api/projects/${projectId}/fs/download?path=${encodeURIComponent(path)}`,
+
+  mkdir: (projectId: string, dir: string, name: string) =>
+    request<{ path: string }>(`/api/projects/${projectId}/fs/mkdir`, {
+      method: "POST",
+      body: JSON.stringify({ dir, name }),
+    }),
 };
 
 export { ApiError };

@@ -120,6 +120,39 @@ export async function readFileSafe(
 }
 
 /**
+ * Create a new directory at <projectPath>/<relDir>/<name>. The parent dir must
+ * already exist and the result must stay inside the project root. `name` is a
+ * single path segment — separators and `..` are rejected.
+ */
+export async function mkdirSafe(
+  projectPath: string,
+  relDir: string,
+  name: string,
+): Promise<{ path: string }> {
+  if (!name || name === "." || name === ".." || /[\\/]/.test(name)) {
+    throw badRequest("invalid folder name");
+  }
+  const parentAbs = resolveSafe(projectPath, relDir);
+  const parentStat = await fs.stat(parentAbs).catch(() => null);
+  if (!parentStat || !parentStat.isDirectory()) {
+    throw badRequest("target is not a directory");
+  }
+  const dirAbs = path.join(parentAbs, name);
+  const rel = path.relative(projectPath, dirAbs);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) {
+    throw badRequest("path escapes project root");
+  }
+  try {
+    await fs.mkdir(dirAbs);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EEXIST") throw badRequest("folder already exists");
+    throw err;
+  }
+  return { path: rel.split(path.sep).join("/") };
+}
+
+/**
  * Write `data` to <projectPath>/<relDir>/<name>. The destination directory must
  * already exist and the resulting path must stay inside the project root. The
  * filename itself may not contain path separators or `..`.

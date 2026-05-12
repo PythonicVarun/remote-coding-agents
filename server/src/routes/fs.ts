@@ -5,6 +5,7 @@ import path from "node:path";
 import { z } from "zod";
 import { getProject } from "../store/projects.js";
 import {
+  mkdirSafe,
   readFileSafe,
   readTree,
   resolveSafe,
@@ -59,6 +60,20 @@ fsRouter.get<ProjectParam>("/download", async (req, res, next) => {
     const stream = createReadStream(abs);
     stream.on("error", next);
     stream.pipe(res);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Create a new subdirectory inside the project. Parent must already exist.
+fsRouter.post<ProjectParam>("/mkdir", async (req, res, next) => {
+  try {
+    const project = await getProject(req.params.projectId);
+    const body = z
+      .object({ dir: z.string().default(""), name: z.string().min(1) })
+      .parse(req.body);
+    const result = await mkdirSafe(project.path, body.dir, body.name);
+    res.json(result);
   } catch (err) {
     next(err);
   }
