@@ -2,21 +2,21 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { api } from "@/lib/api";
-import type { Project, Session } from "@/lib/types";
+import type { Project } from "@/lib/types";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { FileTree } from "@/components/FileTree";
 import { SessionsPanel } from "@/components/SessionsPanel";
 import { TerminalFrame } from "@/components/TerminalFrame";
-import { ChatPanel } from "@/components/ChatPanel";
+// Chat panel temporarily disabled — see also the commented JSX below.
+// import { ChatPanel } from "@/components/ChatPanel";
 import { Resizer } from "@/components/ui/Resizer";
 
 const LS = {
   left: "rca:workspace:leftW",
-  right: "rca:workspace:rightW",
   leftTop: "rca:workspace:leftTopH",
 } as const;
 
-const DEFAULTS = { left: 300, right: 360, leftTop: 320 };
+const DEFAULTS = { left: 300, leftTop: 320 };
 
 function readNum(key: string, fallback: number): number {
   if (typeof window === "undefined") return fallback;
@@ -29,21 +29,16 @@ export function WorkspacePage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Resizable panel sizes. Persisted to localStorage.
   const [leftW, setLeftW] = useState(() => readNum(LS.left, DEFAULTS.left));
-  const [rightW, setRightW] = useState(() => readNum(LS.right, DEFAULTS.right));
   const [leftTopH, setLeftTopH] = useState(() => readNum(LS.leftTop, DEFAULTS.leftTop));
   const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   useEffect(() => {
     window.localStorage.setItem(LS.left, String(Math.round(leftW)));
   }, [leftW]);
-  useEffect(() => {
-    window.localStorage.setItem(LS.right, String(Math.round(rightW)));
-  }, [rightW]);
   useEffect(() => {
     window.localStorage.setItem(LS.leftTop, String(Math.round(leftTopH)));
   }, [leftTopH]);
@@ -60,38 +55,11 @@ export function WorkspacePage() {
     })();
   }, [projectId]);
 
-  // Keep selectedSession (object) in sync with selectedSessionId.
-  useEffect(() => {
-    if (!projectId || !selectedSessionId) {
-      setSelectedSession(null);
-      return;
-    }
-    let stopped = false;
-    let timer: number | undefined;
-    const tick = async () => {
-      try {
-        const list = await api.listSessions(projectId);
-        if (stopped) return;
-        setSelectedSession(list.find((s) => s.id === selectedSessionId) ?? null);
-        timer = window.setTimeout(tick, 4000);
-      } catch {
-        if (!stopped) {
-          timer = window.setTimeout(tick, 4000);
-        }
-      }
-    };
-    void tick();
-    return () => {
-      stopped = true;
-      if (timer) window.clearTimeout(timer);
-    };
-  }, [projectId, selectedSessionId]);
-
   if (!projectId) return null;
 
-  // Build the desktop grid template from the live sizes. Resizers are 6px
-  // columns themselves so the math stays explicit.
-  const desktopTemplate = `${leftW}px 6px minmax(0,1fr) 6px ${rightW}px`;
+  // Build the desktop grid template from the live sizes. The Resizer is a 6px
+  // column itself so the math stays explicit. The chat column is disabled.
+  const desktopTemplate = `${leftW}px 6px minmax(0,1fr)`;
 
   return (
     <div className="flex h-full flex-col">
@@ -158,24 +126,18 @@ export function WorkspacePage() {
             <TerminalFrame projectId={projectId} sessionId={selectedSessionId} />
           </section>
 
-          <Resizer
-            axis="x"
-            value={rightW}
-            onChange={setRightW}
-            invert
-            min={240}
-            max={720}
-            ariaLabel="Resize chat panel"
-          />
-
-          {/* Right: chat */}
-          <aside className="min-w-0 bg-bg-subtle">
-            <ChatPanel
-              projectId={projectId}
-              sessionId={selectedSessionId}
-              sessionTitle={selectedSession?.title}
-            />
-          </aside>
+          {/*
+            Right: chat panel — disabled for now. To restore, re-add:
+              const [rightW, setRightW] = useState(() => readNum("rca:workspace:rightW", 360));
+              const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+              (plus the previous polling effect)
+            then put the columns back at the end of the grid template:
+              `${leftW}px 6px minmax(0,1fr) 6px ${rightW}px`
+            and re-render <Resizer axis="x" invert ... /> followed by
+              <aside className="min-w-0 bg-bg-subtle">
+                <ChatPanel projectId={projectId} sessionId={selectedSessionId} sessionTitle={selectedSession?.title} />
+              </aside>
+          */}
         </div>
       ) : (
         // Mobile / narrow: stacked layout. Resize handles disabled on touch.
@@ -197,13 +159,7 @@ export function WorkspacePage() {
             <TerminalFrame projectId={projectId} sessionId={selectedSessionId} />
           </section>
 
-          <aside className="min-h-[280px] bg-bg-subtle">
-            <ChatPanel
-              projectId={projectId}
-              sessionId={selectedSessionId}
-              sessionTitle={selectedSession?.title}
-            />
-          </aside>
+          {/* Chat panel disabled. See the desktop branch comment for restoration steps. */}
         </div>
       )}
     </div>

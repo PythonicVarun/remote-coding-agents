@@ -2,16 +2,68 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import type { Session } from "@/lib/types";
 import { Badge } from "@/components/ui/Badge";
+import { useTheme } from "@/lib/useTheme";
 
 interface TerminalFrameProps {
   projectId: string;
   sessionId: string | null;
 }
 
+const darkTheme = {
+  background: "#0b1114",
+  foreground: "#e8eef2",
+  cursor: "#2f7cf6",
+  cursorAccent: "#0b1114",
+  selectionBackground: "#12233f",
+  selectionForeground: "#f7fafc",
+  black: "#10181d",
+  red: "#f36d6d",
+  green: "#31c48d",
+  yellow: "#f2b84b",
+  blue: "#2f7cf6",
+  magenta: "#b58bf6",
+  cyan: "#5cbfb8",
+  white: "#a5b2bc",
+  brightBlack: "#40535f",
+  brightRed: "#ff8b8b",
+  brightGreen: "#5ed3a8",
+  brightYellow: "#ffc966",
+  brightBlue: "#5a98f7",
+  brightMagenta: "#d5acff",
+  brightCyan: "#7fd9d2",
+  brightWhite: "#e8eef2",
+};
+
+const lightTheme = {
+  background: "#f6f8fa",
+  foreground: "#0b1114",
+  cursor: "#2f7cf6",
+  cursorAccent: "#f6f8fa",
+  selectionBackground: "#e3edff",
+  selectionForeground: "#0b1114",
+  black: "#d6dce2",
+  red: "#c43030",
+  green: "#1f9d6a",
+  yellow: "#b67200",
+  blue: "#2f7cf6",
+  magenta: "#9b59b6",
+  cyan: "#3498db",
+  white: "#6b7785",
+  brightBlack: "#afbac4",
+  brightRed: "#e74c3c",
+  brightGreen: "#2ecc71",
+  brightYellow: "#f1c40f",
+  brightBlue: "#3498db",
+  brightMagenta: "#9b59b6",
+  brightCyan: "#1abc9c",
+  brightWhite: "#0b1114",
+};
+
 export function TerminalFrame({ projectId, sessionId }: TerminalFrameProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [error, setError] = useState<string | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [theme] = useTheme();
 
   // Keep the selected session fresh. This lets the iframe reconnect when a
   // crashed container is recovered with a new container id / ttyd port.
@@ -139,12 +191,15 @@ export function TerminalFrame({ projectId, sessionId }: TerminalFrameProps) {
   }
 
   // ttyd is being reverse-proxied at /ttyd/<sessionId>/...
-  const src = `/ttyd/${session.id}/`;
+  const currentTheme = theme === "dark" ? darkTheme : lightTheme;
+  const ttydThemeObj = encodeURIComponent(JSON.stringify(currentTheme));
+  const src = `/ttyd/${session.id}/?theme=${ttydThemeObj}`;
   const iframeKey = [
     session.id,
     session.containerId ?? "",
     session.ttydPort ?? "",
     session.recoveryCount ?? 0,
+    theme,
   ].join(":");
   return (
     <iframe
@@ -158,3 +213,4 @@ export function TerminalFrame({ projectId, sessionId }: TerminalFrameProps) {
     />
   );
 }
+

@@ -15,6 +15,7 @@ import type { FsEvent, FsNode } from "@/lib/types";
 import { cn } from "@/lib/cn";
 import { Button } from "@/components/ui/Button";
 import { PromptDialog } from "@/components/ui/PromptDialog";
+import { FilePreviewModal } from "@/components/FilePreviewModal";
 
 interface FileTreeProps {
   projectId: string;
@@ -35,6 +36,7 @@ export function FileTree({ projectId }: FileTreeProps) {
     size: number;
   } | null>(null);
   const [newFolderParent, setNewFolderParent] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<{ path: string; name: string } | null>(null);
 
   const dragCounter = useRef(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -295,6 +297,9 @@ export function FileTree({ projectId }: FileTreeProps) {
               onRowDragEnter={(path) => setDragOverPath(path)}
               onRowDrop={onContainerDrop}
               onCreateChild={openNewFolderDialog}
+              onOpenFile={(node) =>
+                setPreviewFile({ path: node.path, name: node.name })
+              }
             />
           ))
         )}
@@ -321,6 +326,14 @@ export function FileTree({ projectId }: FileTreeProps) {
         validate={(v) => (/[\\/]/.test(v) ? "Slashes are not allowed in a folder name." : null)}
         onSubmit={(name) => void submitNewFolder(newFolderParent ?? "", name)}
         onCancel={() => setNewFolderParent(null)}
+      />
+
+      <FilePreviewModal
+        open={previewFile !== null}
+        projectId={projectId}
+        path={previewFile?.path ?? ""}
+        name={previewFile?.name}
+        onClose={() => setPreviewFile(null)}
       />
     </div>
   );
@@ -397,6 +410,7 @@ interface TreeRowProps {
   onRowDragEnter: (path: string) => void;
   onRowDrop: (e: React.DragEvent, targetDir: string) => void;
   onCreateChild: (parentDir: string) => void | Promise<void>;
+  onOpenFile: (node: FsNode) => void;
 }
 
 function TreeRow({
@@ -409,6 +423,7 @@ function TreeRow({
   onRowDragEnter,
   onRowDrop,
   onCreateChild,
+  onOpenFile,
 }: TreeRowProps) {
   const { node, depth } = entry;
   const isDir = node.type === "directory";
@@ -442,12 +457,11 @@ function TreeRow({
       {...rowDragHandlers}
     >
       <button
-        onClick={isDir ? onToggle : undefined}
+        onClick={() => (isDir ? onToggle() : onOpenFile(node))}
         className={cn(
           "flex flex-1 items-center gap-1 px-2 py-0.5 text-left transition-colors",
           "hover:bg-bg-muted",
           flashed && "bg-accent/15",
-          !isDir && "cursor-default",
         )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
