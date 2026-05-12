@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { Terminal } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export function AppShell() {
   return (
@@ -27,6 +28,7 @@ export function AppShell() {
           >
             Projects
           </NavLink>
+          <ThemeToggle className="ml-1" />
         </nav>
       </header>
       <main className="flex-1 overflow-hidden">

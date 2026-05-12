@@ -1,10 +1,23 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
     <title>Remote Coding Agents</title>
+    <script>
+      // Apply theme before first paint so there is no flash.
+      (function () {
+        try {
+          var saved = localStorage.getItem("rca:theme");
+          var theme = saved === "dark" || saved === "light" ? saved : "light";
+          var html = document.documentElement;
+          html.setAttribute("data-theme", theme);
+          html.style.colorScheme = theme;
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      })();
+    </script>
   </head>
   <body class="bg-bg text-fg antialiased">
     <div id="root"></div>

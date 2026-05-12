@@ -1,36 +1,39 @@
 import type { Config } from "tailwindcss";
 
+const c = (name: string) => `rgb(var(--color-${name}) / <alpha-value>)`;
+
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        // Professional graphite palette with a restrained blue accent.
+        // Tokens are sourced from CSS variables in globals.css. Light is the
+        // default; html[data-theme="dark"] overrides everything.
         bg: {
-          DEFAULT: "#0b1114",
-          subtle: "#10181d",
-          muted: "#172127",
-          elevated: "#1d2930",
+          DEFAULT: c("bg"),
+          subtle: c("bg-subtle"),
+          muted: c("bg-muted"),
+          elevated: c("bg-elevated"),
         },
         border: {
-          DEFAULT: "#27343d",
-          subtle: "#1d2a32",
-          strong: "#40535f",
+          DEFAULT: c("border"),
+          subtle: c("border-subtle"),
+          strong: c("border-strong"),
         },
         fg: {
-          DEFAULT: "#e8eef2",
-          muted: "#a5b2bc",
-          subtle: "#74838f",
-          inverse: "#0b1114",
+          DEFAULT: c("fg"),
+          muted: c("fg-muted"),
+          subtle: c("fg-subtle"),
+          inverse: c("fg-inverse"),
         },
         accent: {
-          DEFAULT: "#2f7cf6",
-          hover: "#5a98f7",
-          subtle: "#12233f",
+          DEFAULT: c("accent"),
+          hover: c("accent-hover"),
+          subtle: c("accent-subtle"),
         },
-        success: { DEFAULT: "#31c48d", subtle: "#0e261f" },
-        warning: { DEFAULT: "#f2b84b", subtle: "#2a210b" },
-        danger: { DEFAULT: "#f36d6d", subtle: "#311516" },
+        success: { DEFAULT: c("success"), subtle: c("success-subtle") },
+        warning: { DEFAULT: c("warning"), subtle: c("warning-subtle") },
+        danger: { DEFAULT: c("danger"), subtle: c("danger-subtle") },
       },
       fontFamily: {
         sans: [
@@ -45,7 +48,7 @@ export default {
       },
       boxShadow: {
         panel:
-          "0 1px 0 0 rgba(255,255,255,0.03) inset, 0 18px 40px rgba(3,10,14,0.32), 0 0 0 1px rgba(11,17,20,0.55)",
+          "0 1px 0 0 rgba(255,255,255,0.03) inset, 0 18px 40px rgba(3,10,14,0.18), 0 0 0 1px rgba(11,17,20,0.06)",
       },
     },
   },

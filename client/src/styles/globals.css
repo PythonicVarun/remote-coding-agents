@@ -2,11 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Theme tokens. Stored as `R G B` triplets so Tailwind's opacity modifier
+ * (e.g. `bg-accent/15`) keeps working via `rgb(var(--color-*) / <alpha-value>)`.
+ * Light is the default; `html[data-theme="dark"]` overrides everything.
+ */
 :root {
-  color-scheme: dark;
-  /* Firefox */
-  scrollbar-color: rgb(64 83 95 / 0.55) transparent;
+  color-scheme: light;
+
+  --color-bg: 246 248 250;
+  --color-bg-subtle: 255 255 255;
+  --color-bg-muted: 238 242 245;
+  --color-bg-elevated: 255 255 255;
+  --color-border: 214 220 226;
+  --color-border-subtle: 230 234 239;
+  --color-border-strong: 175 186 196;
+  --color-fg: 11 17 20;
+  --color-fg-muted: 74 85 96;
+  --color-fg-subtle: 107 119 133;
+  --color-fg-inverse: 246 248 250;
+  --color-accent: 47 124 246;
+  --color-accent-hover: 29 108 224;
+  --color-accent-subtle: 227 237 255;
+  --color-success: 31 157 106;
+  --color-success-subtle: 221 245 232;
+  --color-warning: 182 114 0;
+  --color-warning-subtle: 253 237 202;
+  --color-danger: 196 48 48;
+  --color-danger-subtle: 251 217 217;
+
+  --gradient-blue: rgb(47 124 246 / 0.07);
+  --gradient-green: rgb(31 157 106 / 0.05);
+  --gradient-bottom-start: #f6f8fa;
+  --gradient-bottom-end: #ffffff;
+
+  --scrollbar-thumb: rgb(116 131 143 / 0.45);
+  --scrollbar-thumb-hover: rgb(47 124 246 / 0.6);
+  --scrollbar-thumb-active: rgb(47 124 246 / 0.85);
+  scrollbar-color: var(--scrollbar-thumb) transparent;
   scrollbar-width: thin;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg: 11 17 20;
+  --color-bg-subtle: 16 24 29;
+  --color-bg-muted: 23 33 39;
+  --color-bg-elevated: 29 41 48;
+  --color-border: 39 52 61;
+  --color-border-subtle: 29 42 50;
+  --color-border-strong: 64 83 95;
+  --color-fg: 232 238 242;
+  --color-fg-muted: 165 178 188;
+  --color-fg-subtle: 116 131 143;
+  --color-fg-inverse: 11 17 20;
+  --color-accent: 47 124 246;
+  --color-accent-hover: 90 152 247;
+  --color-accent-subtle: 18 35 63;
+  --color-success: 49 196 141;
+  --color-success-subtle: 14 38 31;
+  --color-warning: 242 184 75;
+  --color-warning-subtle: 42 33 11;
+  --color-danger: 243 109 109;
+  --color-danger-subtle: 49 21 22;
+
+  --gradient-blue: rgb(47 124 246 / 0.14);
+  --gradient-green: rgb(49 196 141 / 0.12);
+  --gradient-bottom-start: #0b1114;
+  --gradient-bottom-end: #0f171b;
+
+  --scrollbar-thumb: rgb(64 83 95 / 0.55);
+  --scrollbar-thumb-hover: rgb(47 124 246 / 0.55);
+  --scrollbar-thumb-active: rgb(47 124 246 / 0.85);
 }
 
 html,
@@ -18,23 +86,21 @@ body,
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgb(47 124 246 / 0.14), transparent 30%),
-    radial-gradient(circle at top right, rgb(49 196 141 / 0.12), transparent 24%),
-    linear-gradient(180deg, #0b1114 0%, #0f171b 100%);
-  color: #e8eef2;
+    radial-gradient(circle at top left, var(--gradient-blue), transparent 30%),
+    radial-gradient(circle at top right, var(--gradient-green), transparent 24%),
+    linear-gradient(180deg, var(--gradient-bottom-start) 0%, var(--gradient-bottom-end) 100%);
+  color: rgb(var(--color-fg));
   font-family: Aptos, "Segoe UI Variable", "IBM Plex Sans", "Segoe UI", sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   text-rendering: optimizeLegibility;
 }
 
 ::selection {
-  background: rgb(47 124 246 / 0.28);
-  color: #f7fafc;
+  background: rgb(var(--color-accent) / 0.28);
+  color: rgb(var(--color-fg));
 }
 
-/* Scrollbar tuning to fit the graphite theme. Applied with * so nested
-   scrollers inherit the look; the .scroll-thin utility shrinks the gutter
-   for dense panels (file tree, chat). */
+/* Scrollbar tuning. Themed via vars; .scroll-thin / .no-scrollbar are opt-ins. */
 *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -43,18 +109,18 @@ body {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background-color: rgb(64 83 95 / 0.55);
+  background-color: var(--scrollbar-thumb);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
   transition: background-color 0.15s ease;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background-color: rgb(47 124 246 / 0.55);
+  background-color: var(--scrollbar-thumb-hover);
   background-clip: padding-box;
 }
 *::-webkit-scrollbar-thumb:active {
-  background-color: rgb(47 124 246 / 0.85);
+  background-color: var(--scrollbar-thumb-active);
   background-clip: padding-box;
 }
 *::-webkit-scrollbar-corner {
@@ -76,14 +142,12 @@ body {
   scrollbar-width: none;
 }
 
-/* Focus rings */
 :focus-visible {
-  outline: 2px solid rgb(47 124 246 / 0.55);
+  outline: 2px solid rgb(var(--color-accent) / 0.55);
   outline-offset: 1px;
   border-radius: 2px;
 }
 
-/* Slight reduction in heading weight for the professional look */
 h1,
 h2,
 h3 {
@@ -93,7 +157,7 @@ h3 {
 @media (max-width: 1023px) {
   body {
     background:
-      radial-gradient(circle at top left, rgb(47 124 246 / 0.16), transparent 36%),
-      linear-gradient(180deg, #0b1114 0%, #0f171b 100%);
+      radial-gradient(circle at top left, var(--gradient-blue), transparent 36%),
+      linear-gradient(180deg, var(--gradient-bottom-start) 0%, var(--gradient-bottom-end) 100%);
   }
 }
