@@ -13,7 +13,6 @@ import {
   ensureAgentImage,
   startSessionContainer,
   stopAndRemoveContainer,
-  verifyWorkspaceWritable,
 } from "./docker.js";
 import { ensureProjectTreeWritable } from "./project-permissions.js";
 import { sendChatToSession } from "./chat.js";
@@ -115,7 +114,6 @@ export async function createAndStartSession(input: CreateSessionInput): Promise<
       hostProjectPath: project.path,
       agent: input.agent,
     });
-    await verifyWorkspaceWritable(containerId);
     let running = await updateSession(session.id, {
       status: "running",
       containerId,

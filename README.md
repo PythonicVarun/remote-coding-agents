@@ -115,6 +115,8 @@ CLIENT_PORT=5173
 PROJECTS_ROOT=./projects          # where project folders live (absolute or repo-relative)
 DATA_ROOT=./data                  # where state.json is persisted
 AGENT_IMAGE=rca-agent:latest      # docker image tag for the agent container
+DOCKER_HOST_WORKSPACE_ROOT=       # optional: repo path as seen by Docker daemon
+DOCKER_HOST_PROJECTS_ROOT=        # optional: projects path as seen by Docker daemon
 TTYD_PORT_MIN=7700                # host port range used to publish each session's ttyd
 TTYD_PORT_MAX=7800
 ANTHROPIC_API_KEY=                # required for Claude Code sessions
@@ -137,7 +139,7 @@ Restart `npm run dev` after editing `.env`.
    - If the agent CLI exits or crashes, it is relaunched in resume/continue mode; if the whole session container exits, the backend restarts that same session container automatically. Both cases show a restart popup in the UI.
 5. **Stop the session.** Hover the session card and click the trash icon — the container is stopped and removed.
 
-At session startup the backend performs a small write probe inside `/workspace`. If the bind-mounted project directory is not writable, session creation fails early instead of letting the agent run without syncing changes back to the host.
+At session startup the backend checks that Docker is mounting the same project directory the server sees, then performs a small write probe inside `/workspace`. On normal local hosts and Docker Desktop, the project path is used directly. When the backend itself runs inside a Linux container, it also derives Docker-visible path candidates from `/proc/self/mountinfo` and known same-filesystem checkout aliases, then verifies them with a marker file before starting the real session. For remote or custom Docker-outside-of-Docker setups where the daemon sees different absolute paths, set `DOCKER_HOST_WORKSPACE_ROOT` or `DOCKER_HOST_PROJECTS_ROOT`.
 
 UI-created containers run as the image's `agent` user by default. On POSIX hosts, session startup maps the container process to the project directory owner (`uid:gid`) when available; otherwise it falls back to the image default user, with no fixed host-specific UID/GID requirement.
 
