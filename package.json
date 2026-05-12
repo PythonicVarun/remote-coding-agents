@@ -9,11 +9,12 @@
   ],
   "scripts": {
     "setup": "node scripts/setup.mjs",
-    "dev": "npm-run-all --parallel dev:server dev:client",
+    "start": "node scripts/start.mjs",
+    "dev": "node scripts/start.mjs",
     "dev:server": "npm --workspace server run dev",
     "dev:client": "npm --workspace client run dev",
     "build": "npm --workspace server run build && npm --workspace client run build",
-    "start": "npm --workspace server run start",
+    "start:server": "npm --workspace server run start",
     "docker:build-agent": "docker build -t rca-agent:latest -f docker/agent/Dockerfile docker/agent",
     "lint": "npm --workspace server run lint --if-present && npm --workspace client run lint --if-present"
   },

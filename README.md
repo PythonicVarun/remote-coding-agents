@@ -18,15 +18,19 @@ The agent (Claude Code by default) runs in YOLO mode (`--dangerously-skip-permis
 git clone <this-repo>
 cd remote-coding-agents
 npm run setup            # interactive TUI: checks prereqs, writes .env, installs, builds image
+npm start                # normal day-to-day startup: launches backend + frontend
 ```
 
-The setup script is the intended single entrypoint after cloning. It will offer to run `npm run dev` for you at the end. Then open <http://localhost:5173>.
+Use `npm run setup` once after cloning. After that, use `npm start` for regular development startup. It reuses your existing install, seeds `.env` from `.env.example` if needed, warns if the agent image is missing, and launches both dev servers. Then open <http://localhost:5173>.
 
 If you'd rather drive it yourself after running setup once:
 
 ```bash
-npm run dev                  # start backend + frontend in parallel (with hot reload)
+npm run dev                  # same as npm start
+npm --workspace server run dev  # backend only
+npm --workspace client run dev  # frontend only
 npm run build                # production build of both
+npm run start:server         # built backend only
 npm run docker:build-agent   # rebuild the agent container image
 ```
 
@@ -62,6 +66,7 @@ remote-coding-agents/
 │   ├── Dockerfile       # ubuntu:24.04 + node 20 + git + tmux + ttyd + claude-code
 │   └── entrypoint.sh    # Starts agent inside detached tmux session; ttyd attaches
 ├── scripts/setup.mjs    # TUI bootstrap with @clack/prompts
+├── scripts/start.mjs    # lightweight everyday starter
 ├── projects/            # User project folders live here (gitignored)
 ├── data/                # JSON state lives here (gitignored)
 └── .env.example
@@ -125,7 +130,7 @@ GEMINI_API_KEY=                   # required for Gemini sessions (GOOGLE_API_KEY
 GITHUB_TOKEN=                     # required for GitHub Copilot CLI sessions
 ```
 
-Restart `npm run dev` after editing `.env`.
+Restart `npm start` after editing `.env`.
 
 ## Using the app
 
@@ -164,12 +169,14 @@ Agent CLI state is stored under `DATA_ROOT/agent-homes/` and mounted as the cont
 ## Development
 
 ```bash
-npm run dev                     # parallel server + client with hot reload
+npm start                       # lightweight everyday startup
+npm run dev                     # alias of npm start
 npm --workspace server run dev  # backend only (tsx watch)
 npm --workspace client run dev  # frontend only (vite)
 npm --workspace server run lint # tsc --noEmit on server
 npm --workspace client run lint # tsc --noEmit on client
 npm run build                   # production build of both
+npm run start:server            # built backend only
 ```
 
 The Vite dev server proxies `/api`, `/socket.io`, and `/ttyd` to the backend, so the frontend at `:5173` looks like a single origin even though the backend runs on `:4000`.
