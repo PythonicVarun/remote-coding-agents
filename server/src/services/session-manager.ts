@@ -114,6 +114,7 @@ export async function createAndStartSession(input: CreateSessionInput): Promise<
       name: containerName,
       hostProjectPath: project.path,
       agent: input.agent,
+      initialCmd: initialPrompt,
       hostAgentHomePath: agentHomePathForSession(session),
     });
     let running = await updateSession(session.id, {
@@ -122,22 +123,6 @@ export async function createAndStartSession(input: CreateSessionInput): Promise<
       ttydPort: hostTtydPort,
       lastError: undefined,
     });
-    if (initialPrompt) {
-      try {
-        await deliverInitialPrompt(containerId, initialPrompt);
-      } catch (err) {
-        running = await updateSession(session.id, {
-          lastError: `session started, but initial task failed: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-        });
-        log.warn("failed to deliver initial prompt", {
-          sessionId: session.id,
-          containerId,
-          err: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
     log.info("session started", { sessionId: session.id, containerId, hostTtydPort });
     return running;
   } catch (err) {
