@@ -1,6 +1,13 @@
 import { nanoid } from "nanoid";
 import { notFound } from "../lib/errors.js";
-import { mutate, readState, type Session, type AgentKind, type ContainerStrategy } from "./state.js";
+import {
+  mutate,
+  readState,
+  type AgentKind,
+  type ContainerStrategy,
+  type ExtraMount,
+  type Session,
+} from "./state.js";
 
 export async function listSessions(projectId: string): Promise<Session[]> {
   const s = await readState();
@@ -21,6 +28,8 @@ export async function createSession(input: {
   title: string;
   agent: AgentKind;
   containerStrategy: ContainerStrategy;
+  containerEnv?: Record<string, string>;
+  extraMounts?: ExtraMount[];
 }): Promise<Session> {
   return mutate(async (state) => {
     const now = new Date().toISOString();
@@ -31,6 +40,8 @@ export async function createSession(input: {
       agent: input.agent,
       containerStrategy: input.containerStrategy,
       status: "creating",
+      ...(input.containerEnv ? { containerEnv: input.containerEnv } : {}),
+      ...(input.extraMounts ? { extraMounts: input.extraMounts } : {}),
       createdAt: now,
       updatedAt: now,
     };

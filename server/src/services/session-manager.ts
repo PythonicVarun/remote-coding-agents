@@ -8,7 +8,13 @@ import {
   listSessions,
   updateSession,
 } from "../store/sessions.js";
-import { AGENT_KINDS, type AgentKind, type ContainerStrategy, type Session } from "../store/state.js";
+import {
+  AGENT_KINDS,
+  type AgentKind,
+  type ContainerStrategy,
+  type ExtraMount,
+  type Session,
+} from "../store/state.js";
 import {
   ensureAgentImage,
   startSessionContainer,
@@ -28,6 +34,8 @@ export interface CreateSessionInput {
   agent: AgentKind;
   containerStrategy: ContainerStrategy;
   initialPrompt?: string;
+  containerEnv?: Record<string, string>;
+  extraMounts?: ExtraMount[];
 }
 
 function sleep(ms: number): Promise<void> {
@@ -116,6 +124,8 @@ export async function createAndStartSession(input: CreateSessionInput): Promise<
       agent: input.agent,
       initialCmd: initialPrompt,
       hostAgentHomePath: agentHomePathForSession(session),
+      containerEnv: input.containerEnv,
+      extraMounts: input.extraMounts,
     });
     let running = await updateSession(session.id, {
       status: "running",

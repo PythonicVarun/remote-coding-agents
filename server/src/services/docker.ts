@@ -5,10 +5,10 @@ import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
 import { config } from "../config.js";
-import { HttpError, serverError } from "../lib/errors.js";
+import { badRequest, HttpError, serverError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { allocatePort, releasePort, reservePort } from "./ports.js";
-import type { AgentKind } from "../store/state.js";
+import type { AgentKind, ExtraMount } from "../store/state.js";
 
 const log = logger("docker");
 
@@ -50,6 +50,10 @@ export interface StartContainerOpts {
   hostAgentHomePath?: string;
   /** Optional ttyd basic-auth credential. */
   ttydAuth?: string;
+  /** Extra env vars to forward into the container (caller-supplied). */
+  containerEnv?: Record<string, string>;
+  /** Additional bind mounts beyond /workspace and /rca-home. */
+  extraMounts?: ExtraMount[];
 }
 
 /** Translate agent kind into the env vars its CLI looks for. */
@@ -338,6 +342,16 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
   if (opts.resumeLatest) env.push("RCA_AGENT_START_MODE=resume");
   if (opts.hostAgentHomePath) env.push("HOME=/rca-home");
   if (opts.ttydAuth) env.push(`TTYD_AUTH=${opts.ttydAuth}`);
+  if (opts.containerEnv) {
+    for (const [key, value] of Object.entries(opts.containerEnv)) {
+      // Reject anything that looks structurally invalid; let everything else
+      // through so callers can pass arbitrary keys (PASCAL_*, custom_*, etc.).
+      if (!/^[A-Z_][A-Z0-9_]*$/i.test(key)) {
+        throw badRequest(`invalid containerEnv key: ${key}`);
+      }
+      env.push(`${key}=${value}`);
+    }
+  }
 
   let mountSrc: string;
   let homeMountSrc: string | undefined;
@@ -361,6 +375,29 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
   ];
   if (homeMountSrc) {
     mounts.push({ Type: "bind", Source: homeMountSrc, Target: "/rca-home" });
+  }
+  if (opts.extraMounts && opts.extraMounts.length > 0) {
+    for (const m of opts.extraMounts) {
+      if (!path.isAbsolute(m.hostPath)) {
+        throw badRequest(`extraMounts.hostPath must be absolute: ${m.hostPath}`);
+      }
+      if (!path.isAbsolute(m.containerPath)) {
+        throw badRequest(`extraMounts.containerPath must be absolute: ${m.containerPath}`);
+      }
+      try {
+        await fs.mkdir(m.hostPath, { recursive: true });
+      } catch (err) {
+        throw badRequest(`extraMounts.hostPath could not be created: ${m.hostPath}`, {
+          cause: String(err),
+        });
+      }
+      mounts.push({
+        Type: "bind",
+        Source: dockerSrcPath(m.hostPath),
+        Target: m.containerPath,
+        ReadOnly: m.readOnly === true,
+      });
+    }
   }
 
   log.info("creating container", {

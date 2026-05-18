@@ -37,6 +37,17 @@ sessionsRouter.post<ProjectParam>("/", async (req, res, next) => {
           agent: z.enum(["claude", "codex", "gemini", "copilot", "shell"]),
           containerStrategy: z.enum(["per-session", "per-project"]),
           initialPrompt: z.string().max(8000).optional(),
+          containerEnv: z.record(z.string(), z.string()).optional(),
+          extraMounts: z
+            .array(
+              z.object({
+                hostPath: z.string().min(1),
+                containerPath: z.string().min(1),
+                readOnly: z.boolean().optional(),
+              }),
+            )
+            .max(8)
+            .optional(),
         })
         .parse(req.body);
 
@@ -46,6 +57,8 @@ sessionsRouter.post<ProjectParam>("/", async (req, res, next) => {
         agent: body.agent,
         containerStrategy: body.containerStrategy,
         initialPrompt: body.initialPrompt,
+        containerEnv: body.containerEnv,
+        extraMounts: body.extraMounts,
       });
     res.status(201).json(session);
   } catch (err) {

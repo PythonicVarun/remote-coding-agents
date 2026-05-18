@@ -19,6 +19,12 @@ export const AGENT_KINDS: readonly AgentKind[] = [
 ] as const;
 export type ContainerStrategy = "per-session" | "per-project";
 
+export interface ExtraMount {
+  hostPath: string;
+  containerPath: string;
+  readOnly?: boolean;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -50,6 +56,10 @@ export interface Session {
   recoveryCount?: number;
   lastRecoveryAt?: string;
   recoveryMessage?: string;
+  /** Arbitrary env vars forwarded into the container at start time. */
+  containerEnv?: Record<string, string>;
+  /** Additional bind mounts requested at session creation. */
+  extraMounts?: ExtraMount[];
   createdAt: string;
   updatedAt: string;
 }
