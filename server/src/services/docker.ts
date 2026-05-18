@@ -12,6 +12,11 @@ import type { AgentKind } from "../store/state.js";
 
 const log = logger("docker");
 
+// Host IP on which agent containers publish their ttyd port. Defaults to
+// loopback (today's behaviour); overridden to 0.0.0.0 when the server runs
+// inside a container so the published port is reachable from the host bridge.
+const AGENT_BIND_HOST = process.env.RCA_AGENT_BIND_HOST?.trim() || "127.0.0.1";
+
 // dockerode auto-detects via DOCKER_HOST / npipe on Windows / unix socket.
 export const docker = new Docker();
 
@@ -387,7 +392,7 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
         AutoRemove: false,
         Mounts: mounts,
         PortBindings: {
-          [internalPort]: [{ HostPort: String(hostPort), HostIp: "127.0.0.1" }],
+          [internalPort]: [{ HostPort: String(hostPort), HostIp: AGENT_BIND_HOST }],
         },
       },
       Labels: {
