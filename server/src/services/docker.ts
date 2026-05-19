@@ -426,6 +426,9 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
         PortBindings: {
           [internalPort]: [{ HostPort: String(hostPort), HostIp: "127.0.0.1" }],
         },
+        ...(config.containerExtraHosts.length > 0
+          ? { ExtraHosts: [...config.containerExtraHosts] }
+          : {}),
       },
       Labels: {
         "rca.app": "remote-coding-agents",

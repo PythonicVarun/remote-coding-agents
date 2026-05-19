@@ -59,6 +59,16 @@ export const config = {
   },
   // Allow the frontend origin during dev. Tighten in prod.
   corsOrigin: process.env.CORS_ORIGIN?.trim() || "*",
+  // Extra `host:ip` mappings added to every session container's
+  // /etc/hosts via Docker's ExtraHosts. Comma-separated. Defaults to
+  // `host.docker.internal:host-gateway` so bare-Linux Docker matches
+  // Docker Desktop / Codespaces behavior. Set to an empty string to
+  // disable.
+  containerExtraHosts: (process.env.CONTAINER_EXTRA_HOSTS ??
+    "host.docker.internal:host-gateway")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0),
 } as const;
 
 export type Config = typeof config;
