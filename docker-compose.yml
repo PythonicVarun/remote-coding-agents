@@ -27,7 +27,7 @@ services:
           exit 0
         fi
         echo "building agent image $$AGENT_IMAGE"
-        exec docker build -t "$$AGENT_IMAGE" /build
+        exec docker build -f /build/Dockerfile -t "$$AGENT_IMAGE" /build
     environment:
       AGENT_IMAGE: ${AGENT_IMAGE:-rca-agent:latest}
     volumes:
