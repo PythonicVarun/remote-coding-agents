@@ -77,6 +77,13 @@ RUN useradd -m -s /bin/bash agent \
     && echo "agent ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/agent \
     && chmod 0440 /etc/sudoers.d/agent
 
+# OCR MCP tool (stdlib only — no pip deps required)
+COPY tools/ /usr/local/lib/rca-tools/
+RUN chmod +x /usr/local/lib/rca-tools/ocr_server.py
+
+# Default .claude config seeded into every new agent home on first start
+COPY defaults/ /etc/rca-defaults/
+
 # Entrypoint script handles agent-kind selection
 COPY agent-supervisor.sh /usr/local/bin/agent-supervisor.sh
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh

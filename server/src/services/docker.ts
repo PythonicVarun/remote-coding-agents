@@ -60,10 +60,22 @@ export interface StartContainerOpts {
 /** Translate agent kind into the env vars its CLI looks for. */
 function credentialEnvForAgent(agent: AgentKind): string[] {
   switch (agent) {
-    case "claude":
-      return config.apiKeys.anthropic
-        ? [`ANTHROPIC_API_KEY=${config.apiKeys.anthropic}`]
-        : [];
+    case "claude": {
+      // Forward whichever Claude credentials are configured in .env — either
+      // ANTHROPIC_API_KEY (direct) or ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN
+      // (LLM Foundry proxy). Both modes are supported by Claude Code.
+      const envs: string[] = [];
+      const isLlmFoundryProxy = Boolean(config.apiKeys.anthropicBaseUrl && config.apiKeys.anthropicAuthToken);
+      if (isLlmFoundryProxy) {
+        log.info("agent credential: using LLM Foundry proxy for Anthropic API access");
+        if (config.apiKeys.anthropicBaseUrl) envs.push(`ANTHROPIC_BASE_URL=${config.apiKeys.anthropicBaseUrl}`);
+        if (config.apiKeys.anthropicAuthToken) envs.push(`ANTHROPIC_AUTH_TOKEN=${config.apiKeys.anthropicAuthToken}`);
+      } else if (config.apiKeys.anthropic) {
+        log.info("agent credential: using direct Anthropic API key");
+        if (config.apiKeys.anthropic) envs.push(`ANTHROPIC_API_KEY=${config.apiKeys.anthropic}`);
+      }
+      return envs;
+    }
     case "codex":
       return config.apiKeys.openai
         ? [`OPENAI_API_KEY=${config.apiKeys.openai}`]
@@ -339,6 +351,8 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
     `TTYD_PORT=7681`,
     ...credentialEnvForAgent(opts.agent),
   ];
+  // Forward LLM Foundry token to all agent kinds — needed by the OCR MCP tool.
+  if (config.apiKeys.llmFoundry) env.push(`LLMFOUNDRY_TOKEN=${config.apiKeys.llmFoundry}`);
   if (opts.initialCmd) env.push(`INITIAL_CMD=${opts.initialCmd}`);
   if (opts.resumeLatest) env.push("RCA_AGENT_START_MODE=resume");
   if (opts.hostAgentHomePath) env.push("HOME=/rca-home");

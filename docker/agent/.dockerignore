@@ -2,3 +2,7 @@
 !Dockerfile
 !agent-supervisor.sh
 !entrypoint.sh
+!tools/
+!tools/**
+!defaults/
+!defaults/**

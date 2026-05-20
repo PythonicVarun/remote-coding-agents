@@ -13,7 +13,7 @@ export const AGENTS: AgentMeta[] = [
   {
     kind: "claude",
     label: "Claude Code (YOLO)",
-    description: "Anthropic · runs with --dangerously-skip-permissions. Needs ANTHROPIC_API_KEY.",
+    description: "Anthropic · runs with --dangerously-skip-permissions (disabled for root/sudo). Needs ANTHROPIC_API_KEY.",
   },
   {
     kind: "codex",

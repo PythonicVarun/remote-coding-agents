@@ -161,8 +161,16 @@ function writeDotEnv(values) {
     `TTYD_PORT_MIN=${values.TTYD_PORT_MIN}`,
     `TTYD_PORT_MAX=${values.TTYD_PORT_MAX}`,
     "",
-    "# Agent credentials — only the key matching the chosen agent is forwarded.",
+    "# Claude — Option A (direct Anthropic) OR Option B (LLM Foundry proxy).",
+    "# Leave Option A blank if using Option B and vice versa.",
     `ANTHROPIC_API_KEY=${values.ANTHROPIC_API_KEY ?? ""}`,
+    `ANTHROPIC_BASE_URL=${values.ANTHROPIC_BASE_URL ?? ""}`,
+    `ANTHROPIC_AUTH_TOKEN=${values.ANTHROPIC_AUTH_TOKEN ?? ""}`,
+    "",
+    "# LLM Foundry token — used by the built-in OCR tool (all agent kinds).",
+    `LLMFOUNDRY_TOKEN=${values.LLMFOUNDRY_TOKEN ?? ""}`,
+    "",
+    "# Other agent credentials.",
     `OPENAI_API_KEY=${values.OPENAI_API_KEY ?? ""}`,
     `GEMINI_API_KEY=${values.GEMINI_API_KEY ?? ""}`,
     `GITHUB_TOKEN=${values.GITHUB_TOKEN ?? ""}`,
@@ -183,7 +191,8 @@ async function configureEnv() {
   }
   const current = readDotEnv();
 
-  const answers = bailOnCancel(
+  // ── Ports ──────────────────────────────────────────────────────────────────
+  const ports = bailOnCancel(
     await group(
       {
         SERVER_PORT: () =>
@@ -210,12 +219,99 @@ async function configureEnv() {
             initialValue: current.TTYD_PORT_MAX ?? "7800",
             validate: (v) => (/^\d+$/.test(v) ? undefined : "must be a number"),
           }),
-        ANTHROPIC_API_KEY: () =>
-          text({
-            message: "ANTHROPIC_API_KEY (Claude — leave blank to skip)",
-            placeholder: "sk-ant-...",
-            initialValue: current.ANTHROPIC_API_KEY ?? "",
-          }),
+      },
+      { onCancel: () => bailOnCancel("__cancel__") },
+    ),
+  );
+
+  // ── Claude provider ────────────────────────────────────────────────────────
+  // Detect what's already configured so we can pre-select in the list.
+  const existingClaudeProvider =
+    current.ANTHROPIC_AUTH_TOKEN && current.ANTHROPIC_BASE_URL
+      ? "llmfoundry"
+      : current.ANTHROPIC_API_KEY
+        ? "anthropic"
+        : "skip";
+
+  const claudeProvider = bailOnCancel(
+    await select({
+      message: "How do you want to connect Claude Code?",
+      options: [
+        {
+          value: "llmfoundry",
+          label: "LLM Foundry (Straive)",
+          hint: "proxy at llmfoundry.straivedemo.com",
+        },
+        {
+          value: "anthropic",
+          label: "Anthropic (direct)",
+          hint: "your own API key from console.anthropic.com",
+        },
+        {
+          value: "skip",
+          label: "Skip — configure later",
+          hint: "you can set this in the web UI at any time",
+        },
+      ],
+      initialValue: existingClaudeProvider,
+    }),
+  );
+
+  let ANTHROPIC_API_KEY = "";
+  let ANTHROPIC_BASE_URL = "";
+  let ANTHROPIC_AUTH_TOKEN = "";
+  let LLMFOUNDRY_TOKEN = current.LLMFOUNDRY_TOKEN ?? "";
+
+  if (claudeProvider === "llmfoundry") {
+    const LLM_FOUNDRY_DEFAULT = "https://llmfoundry.straivedemo.com/anthropic";
+
+    ANTHROPIC_BASE_URL = bailOnCancel(
+      await text({
+        message: "LLM Foundry base URL",
+        initialValue: current.ANTHROPIC_BASE_URL || LLM_FOUNDRY_DEFAULT,
+        placeholder: LLM_FOUNDRY_DEFAULT,
+      }),
+    ).trim();
+
+    ANTHROPIC_AUTH_TOKEN = bailOnCancel(
+      await text({
+        message: `LLM Foundry token  ${color.dim("→ get yours at llmfoundry.straivedemo.com/code")}`,
+        placeholder: "your-llmfoundry-token",
+        initialValue: current.ANTHROPIC_AUTH_TOKEN ?? "",
+      }),
+    ).trim();
+
+    // Reuse the same token for the OCR tool — the user only needs one token.
+    if (ANTHROPIC_AUTH_TOKEN) {
+      LLMFOUNDRY_TOKEN = ANTHROPIC_AUTH_TOKEN;
+      log.info("Reusing LLM Foundry token for the built-in OCR tool.");
+    }
+
+  } else if (claudeProvider === "anthropic") {
+    ANTHROPIC_API_KEY = bailOnCancel(
+      await text({
+        message: "Anthropic API key",
+        placeholder: "sk-ant-api03-…",
+        initialValue: current.ANTHROPIC_API_KEY ?? "",
+      }),
+    ).trim();
+
+    LLMFOUNDRY_TOKEN = bailOnCancel(
+      await text({
+        message: `LLM Foundry token for OCR tool  ${color.dim("(optional — leave blank to skip)")}`,
+        placeholder: "your-llmfoundry-token  →  llmfoundry.straivedemo.com/code",
+        initialValue: current.LLMFOUNDRY_TOKEN ?? "",
+      }),
+    ).trim();
+
+  } else {
+    log.warn("Claude skipped — you can configure it later via the web UI (Settings → Configure Claude).");
+  }
+
+  // ── Other agent keys ───────────────────────────────────────────────────────
+  const others = bailOnCancel(
+    await group(
+      {
         OPENAI_API_KEY: () =>
           text({
             message: "OPENAI_API_KEY (Codex — leave blank to skip)",
@@ -240,19 +336,22 @@ async function configureEnv() {
   );
 
   const merged = {
-    SERVER_PORT: answers.SERVER_PORT.trim(),
-    CLIENT_PORT: answers.CLIENT_PORT.trim(),
+    SERVER_PORT: ports.SERVER_PORT.trim(),
+    CLIENT_PORT: ports.CLIENT_PORT.trim(),
     PROJECTS_ROOT: current.PROJECTS_ROOT ?? "./projects",
     DATA_ROOT: current.DATA_ROOT ?? "./data",
     AGENT_IMAGE: current.AGENT_IMAGE ?? "rca-agent:latest",
     DOCKER_HOST_WORKSPACE_ROOT: current.DOCKER_HOST_WORKSPACE_ROOT ?? "",
     DOCKER_HOST_PROJECTS_ROOT: current.DOCKER_HOST_PROJECTS_ROOT ?? "",
-    TTYD_PORT_MIN: answers.TTYD_PORT_MIN.trim(),
-    TTYD_PORT_MAX: answers.TTYD_PORT_MAX.trim(),
-    ANTHROPIC_API_KEY: (answers.ANTHROPIC_API_KEY ?? "").trim(),
-    OPENAI_API_KEY: (answers.OPENAI_API_KEY ?? "").trim(),
-    GEMINI_API_KEY: (answers.GEMINI_API_KEY ?? "").trim(),
-    GITHUB_TOKEN: (answers.GITHUB_TOKEN ?? "").trim(),
+    TTYD_PORT_MIN: ports.TTYD_PORT_MIN.trim(),
+    TTYD_PORT_MAX: ports.TTYD_PORT_MAX.trim(),
+    ANTHROPIC_API_KEY,
+    ANTHROPIC_BASE_URL,
+    ANTHROPIC_AUTH_TOKEN,
+    LLMFOUNDRY_TOKEN,
+    OPENAI_API_KEY: (others.OPENAI_API_KEY ?? "").trim(),
+    GEMINI_API_KEY: (others.GEMINI_API_KEY ?? "").trim(),
+    GITHUB_TOKEN: (others.GITHUB_TOKEN ?? "").trim(),
   };
   writeDotEnv(merged);
   log.success(`Wrote ${path.relative(repoRoot, envFile)}`);
@@ -336,6 +435,9 @@ async function main() {
       "This script will:",
       "  1. Verify Node and Docker are ready",
       "  2. Create or update .env",
+      "     · ports",
+      "     · Claude provider (LLM Foundry or direct Anthropic)",
+      "     · other agent keys (OpenAI, Gemini, GitHub)",
       "  3. Install npm dependencies",
       "  4. Build the agent Docker image",
       `  5. Optionally launch the app (${launchDev ? "dev" : "production"} mode)`,

@@ -72,9 +72,22 @@ services:
       # if probing fails for your daemon (e.g. remote/custom DooD setups).
       DOCKER_HOST_WORKSPACE_ROOT: ${HOST_REPO_DIR:-}
       DOCKER_HOST_PROJECTS_ROOT: ${HOST_PROJECTS_DIR:-}
-      # Agent credentials — only the key matching the chosen agent kind is
-      # forwarded into each session container by the server.
+      # Agent credentials. Per-agent keys are forwarded only to the matching
+      # agent kind; LLMFOUNDRY_TOKEN is forwarded to all agent kinds (it powers
+      # the built-in OCR MCP tool regardless of which agent the user picks).
+      #
+      # Claude can be wired one of two ways:
+      #   • Direct Anthropic — set ANTHROPIC_API_KEY only.
+      #   • LLM Foundry proxy — set ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN.
+      # If both are set, the proxy takes precedence.
+      #
+      # NOTE: after editing .env you MUST recreate the app container for the
+      # new values to take effect:
+      #   docker compose up -d --force-recreate app
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN:-}
+      LLMFOUNDRY_TOKEN: ${LLMFOUNDRY_TOKEN:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}

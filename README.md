@@ -8,7 +8,7 @@ Create a project, open it, and you get a three-pane workspace:
 - an **embedded terminal** (ttyd) into a Docker container that has the project folder bind-mounted at `/workspace`
 - a **chat panel** that injects messages into the running agent
 
-The agent (Claude Code by default) runs in YOLO mode (`--dangerously-skip-permissions`) inside the container — so it can edit files, run commands, install packages — and you watch every step happen live. The container is isolated; your host shell is not.
+The agent (Claude Code by default) runs in YOLO mode (`--dangerously-skip-permissions`) inside the container — so it can edit files, run commands, install packages — and you watch every step happen live. For security, the supervisor disables these "dangerous" CLI flags when the process is running as `root` or under `sudo` (they only apply when running as a non-root user in the container). The container is isolated; your host shell is not.
 
 ---
 
@@ -132,7 +132,7 @@ Each session picks one agent at creation time. The agent image installs all of t
 
 | Agent | CLI | Default flags | Credential env var |
 | --- | --- | --- | --- |
-| **Claude Code** | `claude` (`@anthropic-ai/claude-code`) | `--dangerously-skip-permissions` | `ANTHROPIC_API_KEY` |
+| **Claude Code** | `claude` (`@anthropic-ai/claude-code`) | `--dangerously-skip-permissions` (disabled for root/sudo) | `ANTHROPIC_API_KEY` |
 | **Codex** | `codex` (`@openai/codex`) | `--yolo` | `OPENAI_API_KEY` |
 | **Gemini CLI** | `gemini` (`@google/gemini-cli`) | `--yolo` | `GEMINI_API_KEY` or `GOOGLE_API_KEY` |
 | **GitHub Copilot CLI** | `copilot` (`@github/copilot`) | `--yolo` | `GITHUB_TOKEN` |

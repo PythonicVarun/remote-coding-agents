@@ -30,6 +30,68 @@ if [[ -z "$CURRENT_HOME" || ! -d "$CURRENT_HOME" || ! -w "$CURRENT_HOME" ]]; the
   export HOME
 fi
 
+# Seed Claude Code defaults into the agent home on first use:
+#   • Skill folders → $HOME/.claude/skills/<name>/SKILL.md  (Claude scans this dir)
+#   • MCP servers   → merged into $HOME/.claude.json  (top-level "mcpServers" key)
+#
+# Existing files/entries are never overwritten so user edits persist.
+# Skills/servers gated on LLMFOUNDRY_TOKEN (currently: "ocr") are only seeded
+# when that token is present — otherwise the model is never told about a tool
+# whose backend it can't actually reach.
+if [[ -d "/etc/rca-defaults" ]]; then
+  mkdir -p "$HOME/.claude/skills"
+  _llmfoundry_available="${LLMFOUNDRY_TOKEN:+yes}"
+
+  # ---- Skills ---------------------------------------------------------------
+  # Each subdir of defaults/.claude/skills/ is a skill (folder with SKILL.md).
+  if [[ -d "/etc/rca-defaults/.claude/skills" ]]; then
+    for src_dir in /etc/rca-defaults/.claude/skills/*/; do
+      [[ -d "$src_dir" ]] || continue
+      skill_name="$(basename "$src_dir")"
+      if [[ "$skill_name" == "ocr" && -z "$_llmfoundry_available" ]]; then
+        continue
+      fi
+      dst_dir="$HOME/.claude/skills/$skill_name"
+      [[ -e "$dst_dir" ]] || cp -r "$src_dir" "$dst_dir"
+    done
+  fi
+
+  # ---- MCP servers (merged into ~/.claude.json) -----------------------------
+  default_claude_json="/etc/rca-defaults/.claude.json"
+  if [[ -f "$default_claude_json" ]]; then
+    target_claude_json="$HOME/.claude.json"
+    python3 - "$default_claude_json" "$target_claude_json" "$_llmfoundry_available" <<'PY'
+import json, sys, os
+defaults_path, target_path, llmfoundry_flag = sys.argv[1], sys.argv[2], sys.argv[3]
+
+with open(defaults_path) as f:
+    defaults = json.load(f)
+
+if os.path.exists(target_path):
+    try:
+        with open(target_path) as f:
+            target = json.load(f)
+    except Exception:
+        target = {}
+else:
+    target = {}
+
+servers = target.setdefault("mcpServers", {})
+changed = False
+for name, cfg in defaults.get("mcpServers", {}).items():
+    if name == "ocr" and not llmfoundry_flag:
+        continue
+    if name not in servers:
+        servers[name] = cfg
+        changed = True
+
+if changed or not os.path.exists(target_path):
+    with open(target_path, "w") as f:
+        json.dump(target, f, indent=2)
+PY
+  fi
+fi
+
 # Start (or re-create) the tmux session running the shell or the agent
 # supervisor. The supervisor keeps the interactive agent alive and resumes the
 # latest conversation if the user exits the CLI or it crashes.
