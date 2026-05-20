@@ -318,6 +318,18 @@ async function resolveContainerUser(hostProjectPath: string): Promise<string | u
   try {
     const stat = await fs.stat(hostProjectPath);
     if (typeof stat.uid === "number" && typeof stat.gid === "number") {
+      // Never force agent containers to run as root: claude/codex disable their
+      // YOLO flags when EUID==0, and the image already ships a non-root `agent`
+      // user with passwordless sudo. On Docker Desktop bind mounts commonly
+      // report root ownership even though the FUSE layer makes them universally
+      // writable, so the override hurts more than it helps there.
+      if (stat.uid === 0) {
+        log.warn(
+          "host project directory reports root ownership — using image default user (agent) so YOLO mode stays available",
+          { hostProjectPath },
+        );
+        return undefined;
+      }
       return `${stat.uid}:${stat.gid}`;
     }
     log.warn("project uid/gid not numeric; using image default user", {
