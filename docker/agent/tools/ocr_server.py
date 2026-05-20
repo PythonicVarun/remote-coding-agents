@@ -80,59 +80,108 @@ TOOLS = [
 ]
 
 
+def _field_value_text(field) -> str:
+    """Render a domain-model field value (possibly nested) as one inline string."""
+    if not isinstance(field, dict):
+        return "" if field is None else str(field)
+
+    vtype = field.get("value_type") or field.get("type")
+    value = field.get("value")
+    content = field.get("content") or ""
+
+    if vtype == "dictionary" and isinstance(value, dict):
+        sub = [f"{k}={_field_value_text(v)}" for k, v in sorted(value.items())]
+        return "{ " + ", ".join(s for s in sub if s.split("=", 1)[1]) + " }"
+    if vtype == "address" and isinstance(value, dict):
+        parts = []
+        if value.get("house_number") and value.get("road"):
+            parts.append(f"{value['house_number']} {value['road']}")
+        elif value.get("street_address"):
+            parts.append(value["street_address"])
+        for k in ("city", "state", "postal_code", "country_region"):
+            if value.get(k):
+                parts.append(str(value[k]))
+        return ", ".join(parts) or content
+    if vtype in ("selectionMark", "selection_mark"):
+        return str(value) if value is not None else content
+    if vtype == "array" and isinstance(value, list):
+        return "[" + ", ".join(_field_value_text(v) for v in value) + "]"
+    if vtype == "currency" and isinstance(value, dict):
+        amt = value.get("amount")
+        sym = value.get("currency_symbol") or value.get("currency_code") or ""
+        return f"{sym}{amt}" if amt is not None else content
+
+    if value is not None and value != "":
+        return str(value)
+    return content
+
+
 def _format_result(result: dict) -> str:
-    """Convert Form Recognizer JSON response into readable text."""
-    ar = result.get("analyzeResult", {})
+    """Convert Form Recognizer JSON response into readable text.
+
+    Handles the flat v2023-07-31 schema (snake_case) returned by LLM Foundry
+    and falls back to the legacy camelCase analyzeResult.* schema if present.
+    """
+    # New schema is flat; legacy nests fields under analyzeResult.
+    ar = result.get("analyzeResult", result)
     parts: list[str] = []
 
-    # Extracted text by page
+    # ---- Per-page line text ---------------------------------------------------
     pages = ar.get("pages", [])
     for page in pages:
-        page_num = page.get("pageNumber", "?")
-        lines = [ln.get("content", "") for ln in page.get("lines", [])]
+        page_num = page.get("page_number", page.get("pageNumber", "?"))
+        lines = [(ln.get("content") or "").strip() for ln in page.get("lines", [])]
+        lines = [ln for ln in lines if ln]
         if lines:
             parts.append(f"--- Page {page_num} ---\n" + "\n".join(lines))
 
-    # Key-value pairs (from prebuilt-document / domain models)
-    kv_pairs = ar.get("keyValuePairs", [])
-    if kv_pairs:
-        kv_lines = []
-        for pair in kv_pairs:
-            key = pair.get("key", {}).get("content", "")
-            val = pair.get("value", {}).get("content", "") if pair.get("value") else ""
-            if key:
-                kv_lines.append(f"  {key}: {val}")
-        if kv_lines:
-            parts.append("--- Key-Value Pairs ---\n" + "\n".join(kv_lines))
+    # ---- Key-value pairs (prebuilt-document and above) -----------------------
+    kv_pairs = ar.get("key_value_pairs") or ar.get("keyValuePairs") or []
+    kv_lines = []
+    for pair in kv_pairs:
+        key_obj = pair.get("key") or {}
+        val_obj = pair.get("value") or {}
+        key = (key_obj.get("content") or "").strip()
+        val = (val_obj.get("content") or "").strip() if val_obj else ""
+        if key:
+            kv_lines.append(f"  {key}: {val}")
+    if kv_lines:
+        parts.append("--- Key-Value Pairs ---\n" + "\n".join(kv_lines))
 
-    # Tables
+    # ---- Tables ---------------------------------------------------------------
     tables = ar.get("tables", [])
     for i, table in enumerate(tables, 1):
         rows: dict[int, dict[int, str]] = {}
         for cell in table.get("cells", []):
-            r, c = cell.get("rowIndex", 0), cell.get("columnIndex", 0)
-            rows.setdefault(r, {})[c] = cell.get("content", "")
+            r = cell.get("row_index", cell.get("rowIndex", 0))
+            c = cell.get("column_index", cell.get("columnIndex", 0))
+            content = (cell.get("content") or "").replace("\n", " ").strip()
+            rows.setdefault(r, {})[c] = content
         if rows:
             max_col = max(max(cols.keys()) for cols in rows.values()) + 1
-            lines = []
+            text_rows = []
             for r in sorted(rows.keys()):
                 row_cells = [rows[r].get(c, "") for c in range(max_col)]
-                lines.append(" | ".join(row_cells))
-            parts.append(f"--- Table {i} ---\n" + "\n".join(lines))
+                text_rows.append(" | ".join(row_cells))
+            parts.append(
+                f"--- Table {i} ({table.get('row_count', len(rows))}x{table.get('column_count', max_col)}) ---\n"
+                + "\n".join(text_rows)
+            )
 
-    # Structured document fields (invoices, receipts, IDs, etc.)
+    # ---- Documents (domain models: invoice, receipt, IDs, tax forms, …) ------
     docs = ar.get("documents", [])
     for doc in docs:
-        doc_type = doc.get("docType", "document")
+        doc_type = doc.get("doc_type", doc.get("docType", "document"))
         fields = doc.get("fields", {})
-        if fields:
-            field_lines = []
-            for field_name, field_val in fields.items():
-                val_content = field_val.get("content", field_val.get("valueString", ""))
-                if val_content:
-                    field_lines.append(f"  {field_name}: {val_content}")
-            if field_lines:
-                parts.append(f"--- {doc_type} Fields ---\n" + "\n".join(field_lines))
+        if not fields:
+            continue
+        field_lines = []
+        for field_name in sorted(fields):
+            text = _field_value_text(fields[field_name])
+            if text:
+                field_lines.append(f"  {field_name}: {text}")
+        if field_lines:
+            parts.append(f"--- {doc_type} Fields ---\n" + "\n".join(field_lines))
 
     return "\n\n".join(parts) if parts else json.dumps(result, indent=2)
 

@@ -56,6 +56,13 @@ if [[ -d "/etc/rca-defaults" ]]; then
     done
   fi
 
+  # ---- Agent instructions (CLAUDE.md auto-loaded as user-level memory) ------
+  # Only seed when LLMFOUNDRY_TOKEN is available — the file is OCR-centric and
+  # mentioning a tool the model can't actually call is worse than silence.
+  if [[ -n "$_llmfoundry_available" && -f "/etc/rca-defaults/.claude/CLAUDE.md" ]]; then
+    [[ -f "$HOME/.claude/CLAUDE.md" ]] || cp "/etc/rca-defaults/.claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
+  fi
+
   # ---- MCP servers (merged into ~/.claude.json) -----------------------------
   default_claude_json="/etc/rca-defaults/.claude.json"
   if [[ -f "$default_claude_json" ]]; then
