@@ -138,6 +138,21 @@ async function recoverSessionContainer(
         typeof opts.exitCode === "number" ? ` (code ${opts.exitCode})` : ""
       }; restarted automatically`;
 
+    // Re-check the session right before doing irreversible work. If it was
+    // marked stopped (e.g. user is mid-delete) or removed entirely while this
+    // closure waited on the dedupe lock, bail out so we don't spawn a
+    // replacement container the user no longer wants.
+    const current = await getSession(session.id).catch(() => null);
+    if (!current || current.status !== "running" || current.containerId !== oldContainerId) {
+      log.info("skipping recovery: session no longer expects this container", {
+        sessionId: session.id,
+        oldContainerId,
+        nowStatus: current?.status,
+        nowContainerId: current?.containerId,
+      });
+      return;
+    }
+
     try {
       await stopAndRemoveContainer(oldContainerId, session.ttydPort).catch((err) => {
         log.warn("best-effort stale container cleanup failed", {

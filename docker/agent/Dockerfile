@@ -77,6 +77,33 @@ RUN useradd -m -s /bin/bash agent \
     && echo "agent ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/agent \
     && chmod 0440 /etc/sudoers.d/agent
 
+# System-wide tmux config:
+#   • mouse on — wheel events scroll (scrollback in shells, native scroll in
+#     alt-screen TUIs like claude/codex/vim) instead of being faked as arrow
+#     keys by xterm.js.
+#   • set-clipboard on — tmux emits OSC 52 escape sequences on copy, which
+#     xterm.js translates into a browser-clipboard write. Combined with the
+#     drag-end binding below, this gives "drag to select, release to copy"
+#     straight into the user's system clipboard.
+#   • The explicit copy-selection-and-cancel bindings pin the behaviour so it
+#     stays consistent across tmux versions (default differs between 3.2/3.3/3.4).
+RUN printf '%s\n' \
+    'set -g mouse on' \
+    'set -g history-limit 50000' \
+    'set -g set-clipboard on' \
+    '' \
+    '# Drag-select → release-to-copy (emits OSC 52 via set-clipboard on).' \
+    'bind-key -T copy-mode    MouseDragEnd1Pane send-keys -X copy-selection-and-cancel' \
+    'bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection-and-cancel' \
+    > /etc/tmux.conf
+
+# OCR MCP tool (stdlib only — no pip deps required)
+COPY tools/ /usr/local/lib/rca-tools/
+RUN chmod +x /usr/local/lib/rca-tools/ocr_server.py
+
+# Default .claude config seeded into every new agent home on first start
+COPY defaults/ /etc/rca-defaults/
+
 # Entrypoint script handles agent-kind selection
 COPY agent-supervisor.sh /usr/local/bin/agent-supervisor.sh
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh

@@ -12,6 +12,11 @@ import type { AgentKind, ExtraMount } from "../store/state.js";
 
 const log = logger("docker");
 
+// Host IP on which agent containers publish their ttyd port. Defaults to
+// loopback (today's behaviour); overridden to 0.0.0.0 when the server runs
+// inside a container so the published port is reachable from the host bridge.
+const AGENT_BIND_HOST = process.env.RCA_AGENT_BIND_HOST?.trim() || "127.0.0.1";
+
 // dockerode auto-detects via DOCKER_HOST / npipe on Windows / unix socket.
 export const docker = new Docker();
 
@@ -59,10 +64,22 @@ export interface StartContainerOpts {
 /** Translate agent kind into the env vars its CLI looks for. */
 function credentialEnvForAgent(agent: AgentKind): string[] {
   switch (agent) {
-    case "claude":
-      return config.apiKeys.anthropic
-        ? [`ANTHROPIC_API_KEY=${config.apiKeys.anthropic}`]
-        : [];
+    case "claude": {
+      // Forward whichever Claude credentials are configured in .env — either
+      // ANTHROPIC_API_KEY (direct) or ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN
+      // (LLM Foundry proxy). Both modes are supported by Claude Code.
+      const envs: string[] = [];
+      const isLlmFoundryProxy = Boolean(config.apiKeys.anthropicBaseUrl && config.apiKeys.anthropicAuthToken);
+      if (isLlmFoundryProxy) {
+        log.info("agent credential: using LLM Foundry proxy for Anthropic API access");
+        if (config.apiKeys.anthropicBaseUrl) envs.push(`ANTHROPIC_BASE_URL=${config.apiKeys.anthropicBaseUrl}`);
+        if (config.apiKeys.anthropicAuthToken) envs.push(`ANTHROPIC_AUTH_TOKEN=${config.apiKeys.anthropicAuthToken}`);
+      } else if (config.apiKeys.anthropic) {
+        log.info("agent credential: using direct Anthropic API key");
+        if (config.apiKeys.anthropic) envs.push(`ANTHROPIC_API_KEY=${config.apiKeys.anthropic}`);
+      }
+      return envs;
+    }
     case "codex":
       return config.apiKeys.openai
         ? [`OPENAI_API_KEY=${config.apiKeys.openai}`]
@@ -305,6 +322,18 @@ async function resolveContainerUser(hostProjectPath: string): Promise<string | u
   try {
     const stat = await fs.stat(hostProjectPath);
     if (typeof stat.uid === "number" && typeof stat.gid === "number") {
+      // Never force agent containers to run as root: claude/codex disable their
+      // YOLO flags when EUID==0, and the image already ships a non-root `agent`
+      // user with passwordless sudo. On Docker Desktop bind mounts commonly
+      // report root ownership even though the FUSE layer makes them universally
+      // writable, so the override hurts more than it helps there.
+      if (stat.uid === 0) {
+        log.warn(
+          "host project directory reports root ownership — using image default user (agent) so YOLO mode stays available",
+          { hostProjectPath },
+        );
+        return undefined;
+      }
       return `${stat.uid}:${stat.gid}`;
     }
     log.warn("project uid/gid not numeric; using image default user", {
@@ -338,6 +367,8 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
     `TTYD_PORT=7681`,
     ...credentialEnvForAgent(opts.agent),
   ];
+  // Forward LLM Foundry token to all agent kinds — needed by the OCR MCP tool.
+  if (config.apiKeys.llmFoundry) env.push(`LLMFOUNDRY_TOKEN=${config.apiKeys.llmFoundry}`);
   if (opts.initialCmd) env.push(`INITIAL_CMD=${opts.initialCmd}`);
   if (opts.resumeLatest) env.push("RCA_AGENT_START_MODE=resume");
   if (opts.hostAgentHomePath) env.push("HOME=/rca-home");
@@ -424,7 +455,7 @@ export async function startSessionContainer(opts: StartContainerOpts): Promise<S
         AutoRemove: false,
         Mounts: mounts,
         PortBindings: {
-          [internalPort]: [{ HostPort: String(hostPort), HostIp: "127.0.0.1" }],
+          [internalPort]: [{ HostPort: String(hostPort), HostIp: AGENT_BIND_HOST }],
         },
       },
       Labels: {
@@ -460,6 +491,45 @@ export async function stopAndRemoveContainer(
     log.warn("container cleanup failed (continuing)", { containerId, err: String(err) });
   } finally {
     releasePort(hostPort);
+  }
+}
+
+/**
+ * Remove every container matching a given name (typically `rca-<sessionId>`).
+ * Used as a backstop during session deletion: even if a stale containerId in
+ * the store points at a container that's already gone, a parallel recovery
+ * may have spawned a fresh container under the same deterministic name. We
+ * want to clean those up too so they don't outlive the session row.
+ */
+export async function stopAndRemoveContainersByName(name: string): Promise<void> {
+  try {
+    const containers = await docker.listContainers({
+      all: true,
+      filters: { name: [`^/${name}$`] },
+    });
+    await Promise.all(
+      containers.map(async (summary) => {
+        // Docker wraps names with a leading slash and may include linked
+        // aliases; only act on exact matches to avoid clobbering siblings.
+        const exact = (summary.Names ?? []).some((n) => n === `/${name}`);
+        if (!exact) return;
+        const c = docker.getContainer(summary.Id);
+        try {
+          await c.stop({ t: 2 });
+        } catch {
+          /* already stopped — fine */
+        }
+        await c.remove({ force: true }).catch((err) => {
+          log.warn("remove by name failed (continuing)", {
+            name,
+            id: summary.Id,
+            err: String(err),
+          });
+        });
+      }),
+    );
+  } catch (err) {
+    log.warn("listing containers by name failed (continuing)", { name, err: String(err) });
   }
 }
 

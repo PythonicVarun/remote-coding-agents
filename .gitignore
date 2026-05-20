@@ -70,3 +70,6 @@ desktop.ini
 # Archives
 *.tgz
 *.tar.gz
+
+# Claude skills
+!docker/agent/defaults/.claude/

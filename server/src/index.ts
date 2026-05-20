@@ -5,6 +5,7 @@ import { attachSocketIO } from "./sockets/index.js";
 import { attachTtydUpgrade } from "./services/ttyd-proxy.js";
 import { adoptRunningSessions, ensureDockerReady } from "./services/docker.js";
 import { shutdownAll } from "./services/fs-watcher.js";
+import { reconcileProjectsWithDisk } from "./services/project-reconciler.js";
 import { logger } from "./lib/logger.js";
 
 const log = logger("boot");
@@ -30,6 +31,13 @@ async function main(): Promise<void> {
       err: err instanceof Error ? err.message : String(err),
     });
   }
+
+  // Prune ghost project entries whose folders were removed off-API.
+  await reconcileProjectsWithDisk().catch((err) => {
+    log.warn("project reconcile on boot failed (continuing)", {
+      err: err instanceof Error ? err.message : String(err),
+    });
+  });
 
   server.listen(config.serverPort, () => {
     log.info("server listening", {

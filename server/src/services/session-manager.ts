@@ -19,6 +19,7 @@ import {
   ensureAgentImage,
   startSessionContainer,
   stopAndRemoveContainer,
+  stopAndRemoveContainersByName,
 } from "./docker.js";
 import { agentHomePathForSession } from "./agent-home.js";
 import { ensureProjectTreeWritable } from "./project-permissions.js";
@@ -162,8 +163,30 @@ export async function stopAndDeleteSession(sessionId: string): Promise<void> {
     if (stillUsing.length > 0) shouldStopContainer = false;
   }
 
-  if (session.containerId && shouldStopContainer) {
-    await stopAndRemoveContainer(session.containerId, session.ttydPort);
+  // Mark the session as stopped BEFORE we remove the container. Container
+  // removal can take a couple of seconds (tmux + docker stop timeout), and
+  // during that window agent-runtime's periodic sync (triggered by the UI
+  // polling every 4s) would otherwise see status="running" with a now-stopped
+  // container and spawn a replacement — leaving an orphaned container after
+  // the session row is deleted. Setting status="stopped" first makes
+  // syncProjectSessions skip the session, and recoverSessionContainer's
+  // status guard inside its in-flight closure rejects any late callers.
+  if (shouldStopContainer) {
+    await updateSession(sessionId, { status: "stopped", agentState: "stopped" }).catch(() => {});
+    if (session.containerId) {
+      await stopAndRemoveContainer(session.containerId, session.ttydPort);
+    } else {
+      // No known containerId but we still want the port back.
+      // releasePort is idempotent for undefined ports.
+    }
+    // Backstop: a recovery that started just before we set status="stopped"
+    // could have spawned a *new* container with the same deterministic name
+    // (`rca-<sessionId>`) under a different ID. The removal above only
+    // targets the ID we knew about; this sweeps any same-named survivors so
+    // they don't outlive the session row.
+    if (session.containerStrategy === "per-session") {
+      await stopAndRemoveContainersByName(`rca-${sessionId}`);
+    }
   }
 
   await deleteSession(session.id);

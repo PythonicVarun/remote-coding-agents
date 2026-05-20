@@ -18,6 +18,11 @@ import { logger } from "../lib/logger.js";
 
 const log = logger("ttyd-proxy");
 
+// Host that owns the per-session ttyd ports. Defaults to the host loopback the
+// agent containers publish to; overridden to e.g. `host.docker.internal` when
+// the server itself runs inside a container (Docker Compose / DooD).
+const TTYD_PROXY_HOST = process.env.RCA_TTYD_PROXY_HOST?.trim() || "127.0.0.1";
+
 const proxy = httpProxy.createProxyServer({
   ws: true,
   changeOrigin: true,
@@ -49,7 +54,7 @@ async function resolveTarget(sessionId: string): Promise<string | null> {
   try {
     const session = await syncSessionRuntime(sessionId);
     if (session.status !== "running" || !session.ttydPort) return null;
-    return `http://127.0.0.1:${session.ttydPort}`;
+    return `http://${TTYD_PROXY_HOST}:${session.ttydPort}`;
   } catch {
     return null;
   }

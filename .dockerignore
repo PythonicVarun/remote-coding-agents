@@ -1,0 +1,49 @@
+# Trim the build context sent to the daemon to keep `docker build` fast and
+# avoid baking host-only artefacts into the image.
+
+.git
+.gitattributes
+.gitignore
+
+# Local tooling
+.claude
+.devcontainer
+.vscode
+.idea
+
+# Node
+node_modules
+**/node_modules
+.npm
+.pnpm-store
+
+# Build outputs (the Dockerfile rebuilds these inside the image)
+dist
+build
+out
+**/dist
+**/build
+**/out
+.vite
+.cache
+.turbo
+*.tsbuildinfo
+
+# Runtime state — must not leak into the image
+projects/*
+!projects/.gitkeep
+data/*
+!data/.gitkeep
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Logs and misc
+*.log
+*.tgz
+*.tar.gz
+.DS_Store
+Thumbs.db
+desktop.ini
