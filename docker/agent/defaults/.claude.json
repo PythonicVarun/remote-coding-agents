@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ocr": {
+      "command": "python3",
+      "args": ["/usr/local/lib/rca-tools/ocr_server.py"]
+    }
+  }
+}

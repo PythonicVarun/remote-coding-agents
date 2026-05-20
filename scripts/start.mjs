@@ -10,7 +10,8 @@ const repoRoot = path.resolve(here, "..");
 const envFile = path.join(repoRoot, ".env");
 const envExample = path.join(repoRoot, ".env.example");
 
-const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
+const npmCmd = "npm";
+const useShell = process.platform === "win32";
 const checkOnly = process.argv.includes("--check");
 const devMode = process.argv.includes("--dev");
 
@@ -101,7 +102,7 @@ function startChild(label, args) {
   const child = spawn(npmCmd, args, {
     cwd: repoRoot,
     stdio: "inherit",
-    shell: false,
+    shell: useShell,
     env: process.env,
   });
 

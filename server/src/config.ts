@@ -46,16 +46,20 @@ export const config = {
   dockerHostProjectsRoot: process.env.DOCKER_HOST_PROJECTS_ROOT?.trim() || "",
   ttydPortMin: envInt("TTYD_PORT_MIN", 7700),
   ttydPortMax: envInt("TTYD_PORT_MAX", 7800),
-  // Credentials forwarded to agent containers, scoped by agent kind. Only the
-  // matching key is passed into a session's environment; nothing else leaks.
+  // Credentials forwarded to agent containers. Agent-specific keys are scoped
+  // to their matching agent kind; llmFoundry is forwarded to all agent kinds
+  // so the OCR (and other LLM Foundry) tools work regardless of agent.
   apiKeys: {
     anthropic: process.env.ANTHROPIC_API_KEY?.trim() || "",
+    anthropicBaseUrl: process.env.ANTHROPIC_BASE_URL?.trim() || "",
+    anthropicAuthToken: process.env.ANTHROPIC_AUTH_TOKEN?.trim() || "",
     openai: process.env.OPENAI_API_KEY?.trim() || "",
     gemini:
       process.env.GEMINI_API_KEY?.trim() ||
       process.env.GOOGLE_API_KEY?.trim() ||
       "",
     github: process.env.GITHUB_TOKEN?.trim() || "",
+    llmFoundry: process.env.LLMFOUNDRY_TOKEN?.trim() || "",
   },
   // Allow the frontend origin during dev. Tighten in prod.
   corsOrigin: process.env.CORS_ORIGIN?.trim() || "*",

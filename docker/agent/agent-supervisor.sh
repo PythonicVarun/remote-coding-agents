@@ -64,7 +64,12 @@ run_agent() {
         echo "[agent] claude CLI not installed in this image. Install with: sudo npm install -g @anthropic-ai/claude-code"
         exec bash -l
       fi
-      local -a cmd=(claude --dangerously-skip-permissions)
+      local -a cmd=(claude)
+      if [[ "$EUID" -ne 0 && -z "${SUDO_USER:-}" ]]; then
+        cmd+=(--dangerously-skip-permissions)
+      else
+        echo "[supervisor] WARNING: --dangerously-skip-permissions disabled when running as root/sudo for security reasons."
+      fi
       if [[ "$mode" == "resume" ]]; then
         cmd+=(--continue)
       elif [[ -n "${INITIAL_CMD:-}" ]]; then
@@ -78,7 +83,12 @@ run_agent() {
         echo "[agent] codex CLI not installed in this image. Install with: sudo npm install -g @openai/codex"
         exec bash -l
       fi
-      local -a cmd=(codex --dangerously-bypass-approvals-and-sandbox)
+      local -a cmd=(codex)
+      if [[ "$EUID" -ne 0 && -z "${SUDO_USER:-}" ]]; then
+        cmd+=(--dangerously-bypass-approvals-and-sandbox)
+      else
+        echo "[supervisor] WARNING: --dangerously-bypass-approvals-and-sandbox disabled when running as root/sudo for security reasons."
+      fi
       if [[ "$mode" == "resume" ]]; then
         cmd+=(resume --last)
       elif [[ -n "${INITIAL_CMD:-}" ]]; then

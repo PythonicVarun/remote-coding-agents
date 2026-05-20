@@ -1,0 +1,93 @@
+# Turnkey deployment: `docker compose up --build`.
+#
+# Architecture:
+#   - `agent-builder`  one-shot service that builds the per-session agent image
+#                      (rca-agent) before the server starts. Mounted host docker
+#                      socket means the build runs on the host's docker daemon.
+#   - `app`            the backend (Express + Socket.IO + dockerode) with the
+#                      built React client baked in. Spawns sibling agent
+#                      containers via the same mounted docker socket
+#                      (Docker-out-of-Docker — NOT nested Docker).
+#
+# Compose auto-reads `.env` for variable interpolation, so any value referenced
+# as ${FOO} below can be supplied there (and is forwarded through to the app).
+
+services:
+  agent-builder:
+    image: docker:cli
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    # Idempotent: skip the build when the image already exists so repeat
+    # `docker compose up` runs don't pay the cost or risk a registry hiccup.
+    command:
+      - |
+        set -e
+        if docker image inspect "$$AGENT_IMAGE" >/dev/null 2>&1; then
+          echo "agent image $$AGENT_IMAGE already present — skipping build"
+          exit 0
+        fi
+        echo "building agent image $$AGENT_IMAGE"
+        exec docker build -f /build/Dockerfile -t "$$AGENT_IMAGE" /build
+    environment:
+      AGENT_IMAGE: ${AGENT_IMAGE:-rca-agent:latest}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker/agent:/build:ro
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/server/Dockerfile
+    image: rca-app:latest
+    restart: unless-stopped
+    depends_on:
+      agent-builder:
+        condition: service_completed_successfully
+    ports:
+      - "${SERVER_PORT:-4000}:4000"
+    volumes:
+      - ./projects:/app/projects
+      - ./data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      # Lets the server reach the host's loopback on Linux native docker as
+      # well as Docker Desktop, so it can proxy to agent ttyd ports published
+      # by sibling containers. No-op on Docker Desktop (which adds this name
+      # automatically) but required on plain Linux.
+      - "host.docker.internal:host-gateway"
+    environment:
+      SERVER_PORT: "4000"
+      PROJECTS_ROOT: /app/projects
+      DATA_ROOT: /app/data
+      AGENT_IMAGE: ${AGENT_IMAGE:-rca-agent:latest}
+      # ttyd reachability inside DooD: agents publish ports on the host, and
+      # the server reaches them via host.docker.internal. Agents bind to all
+      # interfaces so the publish is reachable from the bridge gateway on
+      # Linux (Docker Desktop tolerates either binding).
+      RCA_TTYD_PROXY_HOST: host.docker.internal
+      RCA_AGENT_BIND_HOST: "0.0.0.0"
+      # Optional explicit host-path overrides. Leave empty to let the server
+      # auto-detect via /proc/self/mountinfo (works on Docker Desktop +
+      # native Linux). Set HOST_REPO_DIR / HOST_PROJECTS_DIR in `.env` only
+      # if probing fails for your daemon (e.g. remote/custom DooD setups).
+      DOCKER_HOST_WORKSPACE_ROOT: ${HOST_REPO_DIR:-}
+      DOCKER_HOST_PROJECTS_ROOT: ${HOST_PROJECTS_DIR:-}
+      # Agent credentials. Per-agent keys are forwarded only to the matching
+      # agent kind; LLMFOUNDRY_TOKEN is forwarded to all agent kinds (it powers
+      # the built-in OCR MCP tool regardless of which agent the user picks).
+      #
+      # Claude can be wired one of two ways:
+      #   • Direct Anthropic — set ANTHROPIC_API_KEY only.
+      #   • LLM Foundry proxy — set ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN.
+      # If both are set, the proxy takes precedence.
+      #
+      # NOTE: after editing .env you MUST recreate the app container for the
+      # new values to take effect:
+      #   docker compose up -d --force-recreate app
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN:-}
+      LLMFOUNDRY_TOKEN: ${LLMFOUNDRY_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}

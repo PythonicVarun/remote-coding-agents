@@ -8,7 +8,7 @@ Create a project, open it, and you get a three-pane workspace:
 - an **embedded terminal** (ttyd) into a Docker container that has the project folder bind-mounted at `/workspace`
 - a **chat panel** that injects messages into the running agent
 
-The agent (Claude Code by default) runs in YOLO mode (`--dangerously-skip-permissions`) inside the container — so it can edit files, run commands, install packages — and you watch every step happen live. The container is isolated; your host shell is not.
+The agent (Claude Code by default) runs in YOLO mode (`--dangerously-skip-permissions`) inside the container — so it can edit files, run commands, install packages — and you watch every step happen live. For security, the supervisor disables these "dangerous" CLI flags when the process is running as `root` or under `sudo` (they only apply when running as a non-root user in the container). The container is isolated; your host shell is not.
 
 ---
 
@@ -24,6 +24,32 @@ npm run start:dev        # start backend + frontend in dev mode
 ```
 
 Use `npm run setup` once after cloning. After that, use `npm start` for the normal startup path. It reuses your existing install, seeds `.env` from `.env.example` if needed, warns if the agent image is missing, builds the backend and frontend, and serves the web app from the backend on <http://localhost:4000>. Use `npm run setup:dev` or `npm run start:dev` when you want the hot-reload backend and Vite dev server instead.
+
+### Run with Docker Compose (no host Node required)
+
+If you'd rather not install Node 20 locally, the repo also ships a `docker-compose.yml` that builds the backend, builds the agent image, and serves the app — all you need is Docker:
+
+```bash
+cp .env.example .env   # optional: set ANTHROPIC_API_KEY etc. before first start
+docker compose up --build
+```
+
+Compose runs the backend inside a container ("Docker-out-of-Docker") and mounts your host's `/var/run/docker.sock` so the server can spawn sibling agent containers on the host daemon — the agent containers are NOT nested. The web app is served on <http://localhost:4000>.
+
+**Everything stateful is bind-mounted, so nothing is lost on `docker compose down/up`:**
+
+- `./projects` → `/app/projects` (RW): user project folders, uploads, and every file the agents create or edit. The agent containers bind-mount their per-session `/workspace` from the same host folder, so agent edits land directly in your checkout in real time.
+- `./data` → `/app/data` (RW): `state.json` (projects + sessions metadata) and `agent-homes/<session-id>/` (per-session agent CLI state used to resume conversations across container restarts).
+- Agent containers themselves are sibling containers — compose does NOT manage them, so `docker compose down` leaves running sessions alone. On the next `up` the server's `adoptRunningSessions` re-attaches to them and reuses their host ports.
+
+> **Docker Desktop on Windows:** the in-container mount table strips the drive-letter prefix, so the server can't auto-derive the path the daemon expects when it asks for new bind mounts. Set these in `.env` before `docker compose up`:
+> ```ini
+> HOST_REPO_DIR=V:\path\to\remote-coding-agents
+> HOST_PROJECTS_DIR=V:\path\to\remote-coding-agents\projects
+> ```
+> Linux native Docker and Docker Desktop on macOS usually work without these.
+
+The existing `npm` workflow is unchanged and remains the primary documented path — pick whichever is easier on your host.
 
 If you'd rather drive it yourself after running setup once:
 
@@ -106,7 +132,7 @@ Each session picks one agent at creation time. The agent image installs all of t
 
 | Agent | CLI | Default flags | Credential env var |
 | --- | --- | --- | --- |
-| **Claude Code** | `claude` (`@anthropic-ai/claude-code`) | `--dangerously-skip-permissions` | `ANTHROPIC_API_KEY` |
+| **Claude Code** | `claude` (`@anthropic-ai/claude-code`) | `--dangerously-skip-permissions` (disabled for root/sudo) | `ANTHROPIC_API_KEY` |
 | **Codex** | `codex` (`@openai/codex`) | `--yolo` | `OPENAI_API_KEY` |
 | **Gemini CLI** | `gemini` (`@google/gemini-cli`) | `--yolo` | `GEMINI_API_KEY` or `GOOGLE_API_KEY` |
 | **GitHub Copilot CLI** | `copilot` (`@github/copilot`) | `--yolo` | `GITHUB_TOKEN` |
