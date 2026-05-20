@@ -457,6 +457,45 @@ export async function stopAndRemoveContainer(
   }
 }
 
+/**
+ * Remove every container matching a given name (typically `rca-<sessionId>`).
+ * Used as a backstop during session deletion: even if a stale containerId in
+ * the store points at a container that's already gone, a parallel recovery
+ * may have spawned a fresh container under the same deterministic name. We
+ * want to clean those up too so they don't outlive the session row.
+ */
+export async function stopAndRemoveContainersByName(name: string): Promise<void> {
+  try {
+    const containers = await docker.listContainers({
+      all: true,
+      filters: { name: [`^/${name}$`] },
+    });
+    await Promise.all(
+      containers.map(async (summary) => {
+        // Docker wraps names with a leading slash and may include linked
+        // aliases; only act on exact matches to avoid clobbering siblings.
+        const exact = (summary.Names ?? []).some((n) => n === `/${name}`);
+        if (!exact) return;
+        const c = docker.getContainer(summary.Id);
+        try {
+          await c.stop({ t: 2 });
+        } catch {
+          /* already stopped — fine */
+        }
+        await c.remove({ force: true }).catch((err) => {
+          log.warn("remove by name failed (continuing)", {
+            name,
+            id: summary.Id,
+            err: String(err),
+          });
+        });
+      }),
+    );
+  } catch (err) {
+    log.warn("listing containers by name failed (continuing)", { name, err: String(err) });
+  }
+}
+
 export async function inspectContainer(containerId: string) {
   const c = docker.getContainer(containerId);
   return c.inspect();
