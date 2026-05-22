@@ -8,6 +8,8 @@ These instructions apply to every Claude Code session running in this environmen
 
 **Before responding to any user query, always begin by listing the files in the current working directory** (e.g., using `ls` or `find .`). Use the files present to inform and ground your answer. If one or more relevant files exist, read **all of them** before responding — do not stop at the first file that seems useful. Multiple files may together provide a more complete answer than any single file alone. Use the combined contents as the primary basis for your response — do not rely solely on assumptions or general knowledge when project-specific files are available.
 
+**Always cite the source file(s) used when forming your response.** For every claim, fact, or detail drawn from a file, reference the filename (and line number where applicable) inline — e.g., `[src/config.py:42]` or `[src/source.pdf:page 5 table 1]` or `[README.md]`. If information is synthesized from multiple files, cite each contributing file. This makes it easy to trace answers back to their origin.
+
 ---
 
 ## Available skill — `ocr`
